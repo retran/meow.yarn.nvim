@@ -32,15 +32,15 @@ Ever feel like you're unraveling a tangled ball of yarn when navigating your cod
 
 ---
 
-## ✨ Core Features
+## ✨ Key Features
 
-- **🌲 Interactive Tree View**: Displays hierarchies in a clear, expandable tree.
-- **🧬 Type Hierarchy**: Explore `supertypes` and `subtypes` of a class or type.
-- **📞 Call Hierarchy**: Navigate `callers` (incoming calls) and `callees` (outgoing calls) of a function.
-- **📄 Live Preview**: See the source code of the selected item in a live preview window.
-- **🚀 Built on Solid Foundations**: Powered by Neovim's native LSP and [nui.nvim](https://github.com/MunifTanjim/nui.nvim).
-- **⚙️ Configurable**: Customize keymaps, window appearance, and more.
-- **💨 Fast & Asynchronous**: All LSP requests are handled asynchronously without blocking the UI.
+- **🌲 Clean, Interactive Tree**: Shows hierarchies in a straightforward, expandable list
+- **🧬 Type & Call Hierarchies**: Explore both supertypes/subtypes and callers/callees of functions
+- **📄 Live Preview**: Instantly see the relevant code for any item you select in the tree
+- **🎯 Jump to Definition**: Press Enter on any item to go directly to its location in the code
+- **🔄 Explore Deeper**: Pick any symbol in the tree and make it the new starting point for exploration, or switch directions (e.g., from callers to callees) on the fly
+- **💨 Fast & Non-Blocking**: Fully asynchronous so it won't freeze your Neovim
+- **🚀 Built on Solid Foundations**: Powered by Neovim's native LSP and [nui.nvim](https://github.com/MunifTanjim/nui.nvim)
 
 ---
 
