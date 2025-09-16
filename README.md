@@ -196,7 +196,7 @@ Inside the hierarchy view, the following default keymappings are available:
 | `<Tab>`          | Toggle expand/collapse for the selected node (`mappings.toggle`)          |
 | `l` or `<Right>` | Expand the selected node (`mappings.expand`, `mappings.expand_alt`)       |
 | `h` or `<Left>`  | Collapse the selected node (`mappings.collapse`, `mappings.collapse_alt`) |
-| `s` / `S`        | Switch hierarchy direction (e.g., from `supertypes` to `subtypes`)        |
+| `K` / `J`        | Open new hierarchy from selected item (K=super/callers, J=sub/callees)    |
 | `q`              | Quit the hierarchy view (`mappings.quit`)                                 |
 
 ---

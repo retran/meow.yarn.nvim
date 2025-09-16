@@ -1,38 +1,76 @@
-*meow-yarn.txt*	For meow.yarn.nvim		Type and Call Hierarchy Visualizer
+*meow-yarn.txt*	For Neovim >= 0.8.0	Last change: 2025 September 16
+
+MEOW.YARN.NVIM				*meow.yarn* *meow-yarn*
+
+A purr-fectly simple way to visualize LSP hierarchies in Neovim.
+
+Ever feel like you're unraveling a tangled ball of yarn when navigating your
+codebase? `meow.yarn.nvim` is here to help. It provides a simple, beautiful,
+and interactive way to explore LSP hierarchies without the usual clutter.
+Forget getting lost in endless definitions and references; `meow.yarn.nvim`
+visualizes type and call hierarchies in a clean, intuitive tree view.
 
 ==============================================================================
-CONTENTS						*meow-yarn-contents*
+CONTENTS					*meow-yarn-contents*
 
-  1. Introduction			|meow-yarn-introduction|
-  2. Installation			|meow-yarn-installation|
-  3. Configuration			|meow-yarn-configuration|
-  4. Usage				|meow-yarn-usage|
-  5. Mappings				|meow-yarn-mappings|
-  6. License				|meow-yarn-license|
+1. Introduction				|meow-yarn-introduction|
+2. Key Features				|meow-yarn-features|
+3. Prerequisites			|meow-yarn-prerequisites|
+4. Getting Started			|meow-yarn-getting-started|
+   - Installation			|meow-yarn-installation|
+   - Quick Start			|meow-yarn-quick-start|
+5. Configuration			|meow-yarn-configuration|
+6. Mappings				|meow-yarn-mappings|
+   - In-Window Mappings		|meow-yarn-in-window-mappings|
+7. Commands				|meow-yarn-commands|
+8. Contributing				|meow-yarn-contributing|
+9. License				|meow-yarn-license|
+10. Acknowledgments			|meow-yarn-acknowledgments|
 
 ==============================================================================
-INTRODUCTION						*meow-yarn-introduction*
+INTRODUCTION					*meow-yarn-introduction*
 
 `meow.yarn.nvim` is a Neovim plugin that provides a simple, beautiful, and
 interactive way to explore LSP hierarchies. It allows you to visualize type
 and call hierarchies in a clean, intuitive tree view, helping you to
 untangle your code's relationships.
 
-Features:
-- Interactive tree view for hierarchies.
-- Type Hierarchy exploration (`supertypes` and `subtypes`).
-- Call Hierarchy navigation (`callers` and `callees`).
-- Live preview of the selected item's source code.
-- Powered by Neovim's native LSP and nui.nvim.
-- Configurable keymaps, window appearance, and more.
+==============================================================================
+KEY FEATURES					*meow-yarn-features*
+
+- *Clean, Interactive Tree*: Shows hierarchies in a straightforward,
+  expandable list.
+- *Type & Call Hierarchies*: Explore both supertypes/subtypes and
+  callers/callees of functions.
+- *Live Preview*: Instantly see the relevant code for any item you select
+  in the tree.
+- *Jump to Definition*: Press Enter on any item to go directly to its
+  location in the code.
+- *Explore Deeper*: Pick any symbol in the tree and make it the new starting
+  point for exploration, or switch directions (e.g., from callers to
+  callees) on the fly.
+- *Fast & Non-Blocking*: Fully asynchronous so it won't freeze your Neovim.
+- *Built on Solid Foundations*: Powered by Neovim's native LSP and
+  `nui.nvim`.
 
 ==============================================================================
-INSTALLATION						*meow-yarn-installation*
+PREREQUISITES				*meow-yarn-prerequisites*
 
-Install `meow.yarn.nvim` using your favorite plugin manager. You must also
-install `MunifTanjim/nui.nvim` as a dependency.
+Required:
+- Neovim: >= 0.8.0
+- LSP Client: An active LSP server that supports `typeHierarchyProvider` or
+  `callHierarchyProvider`.
+- Dependencies: `nui.nvim`
 
-lazy.nvim ~
+==============================================================================
+GETTING STARTED				*meow-yarn-getting-started*
+
+------------------------------------------------------------------------------
+INSTALLATION				*meow-yarn-installation*
+
+Install `meow.yarn.nvim` using your favorite plugin manager.
+
+lazy.nvim:
 >
 	{
 	    "retran/meow.yarn.nvim",
@@ -44,7 +82,7 @@ lazy.nvim ~
 	    end,
 	}
 <
-packer.nvim ~
+packer.nvim:
 >
 	use {
 	    "retran/meow.yarn.nvim",
@@ -54,11 +92,41 @@ packer.nvim ~
 	    end,
 	}
 <
-==============================================================================
-CONFIGURATION						*meow-yarn-configuration*
+rocks.nvim:
+>
+	:Rocks install meow.yarn.nvim
+<
+The dependency (`nui.nvim`) will be automatically installed and managed.
+Then add to your Neovim configuration:
+>
+	require("meow.yarn").setup({
+	    -- Your custom configuration goes here
+	})
+<
 
-You can pass a configuration table to the `setup` function.
-Here are the default values:
+------------------------------------------------------------------------------
+QUICK START				*meow-yarn-quick-start*
+
+The plugin provides the |:MeowYarn| command to open hierarchy views.
+
+- View Type Hierarchy (Supertypes): >
+	:MeowYarn type super
+<
+- View Type Hierarchy (Subtypes): >
+	:MeowYarn type sub
+<
+- View Call Hierarchy (Callers): >
+	:MeowYarn call callers
+<
+- View Call Hierarchy (Callees): >
+	:MeowYarn call callees
+<
+
+==============================================================================
+CONFIGURATION				*meow-yarn-configuration*
+
+You can customize the plugin by passing a configuration table to the `setup`
+function. Here are the defaults:
 >
 	require("meow.yarn").setup({
 	    window = {
@@ -95,9 +163,9 @@ Here are the default values:
 	        },
 	        call_hierarchy = {
 	            icons = {
-	                [6] = "󰆧", -- Method
-	                [12] = "󰊕", -- Function
-	                [13] = "", -- Variable
+	                method = "󰆧",
+	                func = "󰊕",
+	                variable = "",
 	                default = "",
 	            },
 	        },
@@ -105,62 +173,12 @@ Here are the default values:
 	})
 <
 
-Customizing Hierarchy Icons~
-
-You can override the icons for each hierarchy type in the `hierarchies` table:
->
-	require("meow.yarn").setup({
-	    hierarchies = {
-	        type_hierarchy = {
-	            icons = {
-	                class = "C",
-	                struct = "S",
-	                interface = "I",
-	                default = "?",
-	            },
-	        },
-	        call_hierarchy = {
-	            icons = {
-	                method = "M",
-	                func = "F",
-	                variable = "V",
-	                default = "*",
-	            },
-	        },
-	    },
-	})
-<
 ==============================================================================
-USAGE							*meow-yarn-usage*
+MAPPINGS					*meow-yarn-mappings*
 
-The plugin provides the |:MeowYarn| command to open hierarchy views.
+You can map the commands for easier access.
 
-Command Usage:
->
-	:MeowYarn <type|call> <direction>
-<
-Arguments:
-- `<type|call>`: The type of hierarchy to display.
-- `<direction>`:
-  - For `type`: `super` (supertypes) or `sub` (subtypes).
-  - For `call`: `callers` (incoming calls) or `callees` (outgoing calls).
-
-Examples:
->
-	:MeowYarn type super
-	:MeowYarn type sub
-	:MeowYarn call callers
-	:MeowYarn call callees
-<
-You can also map these commands to keybindings for easier access. See
-|meow-yarn-mappings| for examples.
-
-==============================================================================
-MAPPINGS						*meow-yarn-mappings*
-
-You can configure keybindings in your Neovim configuration.
-
-Example Keymaps (Lua):
+Example Lua Keymaps:
 >
 	-- Using lua functions
 	vim.keymap.set("n", "<leader>yt", function() require("meow.yarn").open_tree("type_hierarchy", "supertypes") end, { desc = "Yarn: Type Hierarchy (Super)" })
@@ -174,25 +192,48 @@ Example Keymaps (Lua):
 	vim.keymap.set("n", "<leader>yC", "<Cmd>MeowYarn call callers<CR>", { desc = "Yarn: Callers" })
 	vim.keymap.set("n", "<leader>yc", "<Cmd>MeowYarn call callees<CR>", { desc = "Yarn: Callees" })
 <
-In-Window Mappings~
+
+------------------------------------------------------------------------------
+IN-WINDOW MAPPINGS			*meow-yarn-in-window-mappings*
 
 Inside the hierarchy view, the following default keymappings are available:
 
-|Key|          |Action|
-|`jump`|       |(`mappings.jump`, default: `<CR>`) Jump to the location of the selected item.|
-|`toggle`|     |(`mappings.toggle`, default: `<Tab>`) Toggle expand/collapse for the selected node.|
-|`expand`|     |(`mappings.expand`, default: `l`) Expand the selected node.|
-|`expand_alt`| |(`mappings.expand_alt`, default: `<Right>`) Alternative key to expand the selected node.|
-|`collapse`|   |(`mappings.collapse`, default: `h`) Collapse the selected node.|
-|`collapse_alt`| |(`mappings.collapse_alt`, default: `<Left>`) Alternative key to collapse the selected node.|
-|`s` / `S`|    |Switch hierarchy direction (e.g., from `supertypes` to `subtypes`).|
-|`quit`|       |(`mappings.quit`, default: `q`) Quit the hierarchy view.|
+|Key|		|Action|
+|<CR>|		Jump to the location of the selected item (`mappings.jump`).
+|<Tab>|		Toggle expand/collapse for the selected node (`mappings.toggle`).
+|`l` or `<Right>`|	Expand the selected node (`mappings.expand`, `mappings.expand_alt`).
+|`h` or `<Left>`|	Collapse the selected node (`mappings.collapse`, `mappings.collapse_alt`).
+|`K` / `J`|	Open new hierarchy from selected item (K=super/callers, J=sub/callees).
+|`q`|		Quit the hierarchy view (`mappings.quit`).
 
 ==============================================================================
-LICENSE						*meow-yarn-license*
+COMMANDS					*meow-yarn-commands*
 
-MIT License. See the LICENSE file for details.
+:MeowYarn {hierarchy_type} {direction}
+			Opens the hierarchy view.
 
-Author: Andrew Vasilyev
+			{hierarchy_type}: `type` or `call`
+			{direction}:
+			- for `type`: `super` or `sub`
+			- for `call`: `callers` or `callees`
 
-vim:tw=78:ts=8:sw=4:sts=4:et:ft=help:norl:
+==============================================================================
+CONTRIBUTING				*meow-yarn-contributing*
+
+Contributions are welcome! Feel free to open an issue or submit a pull
+request.
+
+==============================================================================
+LICENSE					*meow-yarn-license*
+
+Licensed under the MIT License. See |LICENSE| for details.
+
+==============================================================================
+ACKNOWLEDGMENTS				*meow-yarn-acknowledgments*
+
+`meow.yarn.nvim` would not be possible without these amazing projects:
+- Neovim (https://neovim.io/)
+- nui.nvim (https://github.com/MunifTanjim/nui.nvim)
+
+==============================================================================
+vim:tw=78:ts=8:sw=8:sts=8:et:ft=help:norl:
