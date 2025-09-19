@@ -1,9 +1,9 @@
 package = "meow.yarn.nvim"
 rockspec_format = "3.0"
-version = "0.1.0-1"
+version = "0.1.1-1"
 source = {
    url = "git+https://github.com/retran/meow.yarn.nvim.git",
-   tag = "v0.1.0"
+   tag = "v0.1.1"
 }
 description = {
    summary = "A purr-fectly simple way to visualize LSP hierarchies in Neovim",
