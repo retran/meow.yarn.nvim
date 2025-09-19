@@ -34,7 +34,6 @@ M.K = {
     PREVIEW_NAMESPACE = "meow_yarn_preview",
     SIGN_CURSOR_NAME = "MeowYarnCursor",
     SIGN_GROUP = "MeowYarnGroup",
-    CURSOR_INVISIBLE_HL = "MeowYarnInvisibleCursor",
 }
 
 ---@class meow.yarn.LspUtils

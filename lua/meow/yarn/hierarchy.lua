@@ -63,7 +63,7 @@ function Hierarchy:new(client, root_item, strategy, direction_key)
             },
         },
         win_options = {
-            winhighlight = "Normal:Normal,FloatBorder:Normal,Cursor:" .. require("meow.yarn.util").K.CURSOR_INVISIBLE_HL,
+            winhighlight = "Normal:Normal,FloatBorder:Normal",
             cursorline = true,
             signcolumn = "yes",
         },
