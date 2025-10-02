@@ -4,10 +4,10 @@
 
 <div align="center">
 
-    ![Neovim](https://img.shields.io/badge/neovim-%23019733.svg?style=for-the-badge&logo=neovim&logoColor=white)
-    ![License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)
-    ![GitHub stars](https://img.shields.io/github/stars/retran/meow.yarn.nvim?style=for-the-badge)
-    ![GitHub forks](https://img.shields.io/github/forks/retran/meow.yarn.nvim?style=for-the-badge)
+![Neovim](https://img.shields.io/badge/neovim-%23019733.svg?style=for-the-badge&logo=neovim&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)
+![GitHub stars](https://img.shields.io/github/stars/retran/meow.yarn.nvim?style=for-the-badge)
+![GitHub forks](https://img.shields.io/github/forks/retran/meow.yarn.nvim?style=for-the-badge)
 
 </div>
 
