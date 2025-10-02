@@ -12,7 +12,6 @@
 </div>
 
 <div align="center">
-
     <img src="https://github.com/retran/meow/raw/dev/assets/icon_small.png" alt="Meow Logo" width="200">
 
     <br>
