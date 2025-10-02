@@ -12,11 +12,11 @@
 </div>
 
 <div align="center">
-    <img src="https://github.com/retran/meow/raw/dev/assets/icon_small.png" alt="Meow Logo" width="200">
 
-    <br>
+<img src="https://github.com/retran/meow/raw/dev/assets/icon_small.png" alt="Meow Logo" width="200" /><br />
 
-    <strong>meow.yarn.nvim - Untangle Your Code's Relationships</strong>
+<strong>meow.yarn.nvim - Untangle Your Code's Relationships</strong>
+
 </div>
 
 Ever feel like you're unraveling a tangled ball of yarn when navigating your codebase? `meow.yarn.nvim` is here to help. It provides a simple, beautiful, and interactive way to explore LSP hierarchies without the usual clutter. Forget getting lost in endless definitions and references; **`meow.yarn.nvim` visualizes type and call hierarchies in a clean, intuitive tree view**.
