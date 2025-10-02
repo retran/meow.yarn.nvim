@@ -26,22 +26,30 @@
 # @license: MIT
 #
 ---
+profiles:
+  fast:
+    provider: "gemini"
+    model: "gemini-2.5-flash"
+
+  smart:
+    provider: "gemini"
+    model: "gemini-2.5-pro"
+    timeout: "10m"
+
 generate:
-  defaultProvider: "gemini"
-  defaultModel: "gemini-2.5-flash"
-  defaultTimeout: "5m"
-  defaultSystemPrompt: >-
-    You are a Neovim plugin development expert and senior Lua developer.
-    You specialize in creating modern, high-quality Neovim plugins following current best practices.
-    You are familiar with Neovim 0.10+ APIs, LuaCATS annotations, proper lazy loading patterns,
-    semantic versioning, and the modern Lua ecosystem including LuaRocks and busted testing.
-    You prioritize type safety, user experience, proper API design, and maintainable architecture.
-    Always follow the nvim-best-practices guidelines for modern plugin development.
+  default:
+    profile: "fast"
+    systemPrompt: >-
+      You are a Neovim plugin development expert and senior Lua developer.
+      You specialize in creating modern, high-quality Neovim plugins following current best practices.
+      You are familiar with Neovim 0.10+ APIs, LuaCATS annotations, proper lazy loading patterns,
+      semantic versioning, and the modern Lua ecosystem including LuaRocks and busted testing.
+      You prioritize type safety, user experience, proper API design, and maintainable architecture.
+      Always follow the nvim-best-practices guidelines for modern plugin development.
 
   tasks:
     review:
-      provider: "gemini"
-      model: "gemini-2.5-pro"
+      profile: "smart"
       userPrompt: >-
         Perform a comprehensive code review of the following Neovim plugin code following nvim-best-practices guidelines.
 
@@ -65,8 +73,7 @@ generate:
           5) Performance — lazy loading and startup optimization suggestions
 
     commit:
-      provider: "gemini"
-      model: "gemini-2.5-pro"
+      profile: "smart"
       userPrompt: >-
         Generate a Conventional Commit message for the provided changes to a Neovim plugin.
 
@@ -82,8 +89,7 @@ generate:
           - Optional footers for breaking changes or issue references
 
     doc:
-      provider: "gemini"
-      model: "gemini-2.5-flash"
+      profile: "fast"
       userPrompt: >-
         Write comprehensive LuaCATS documentation for the following Neovim plugin code,
         following nvim-best-practices guidelines.
@@ -110,8 +116,7 @@ generate:
         Output only the documentation block, not the implementation code.
 
     refactor:
-      provider: "gemini"
-      model: "gemini-2.5-pro"
+      profile: "smart"
       userPrompt: >-
         Refactor the following Neovim plugin code to follow modern nvim-best-practices guidelines
         while preserving all functionality.
@@ -137,8 +142,7 @@ generate:
         Focus on making the code more maintainable, type-safe, and user-friendly.
 
     feature:
-      provider: "gemini"
-      model: "gemini-2.5-pro"
+      profile: "smart"
       userPrompt: >-
         Implement the requested feature for this Neovim plugin following nvim-best-practices guidelines.
 
@@ -170,8 +174,7 @@ generate:
           5) Documentation updates needed for vimdoc
 
     test:
-      provider: "gemini"
-      model: "gemini-2.5-flash"
+      profile: "fast"
       userPrompt: >-
         Create a comprehensive test suite for the provided Neovim plugin code using busted framework,
         following nvim-best-practices testing guidelines.
@@ -202,8 +205,7 @@ generate:
           4) Coverage analysis suggestions
 
     pr:
-      provider: "gemini"
-      model: "gemini-2.5-pro"
+      profile: "smart"
       userPrompt: >-
         Create a comprehensive Pull Request description for the provided diff in a Neovim plugin project.
 
@@ -216,3 +218,46 @@ generate:
           - Migration guide (if needed)
 
         Use appropriate labels: type/(feat|fix|refactor), area/(ui|lsp|config|docs), priority/(high|medium|low)
+
+filter:
+  ignore:
+    - "**/*.lock"
+    - "go.sum"
+    - "dist/**"
+    - "bin/**"
+    - ".git/**"
+
+summarize:
+  default:
+    profile: "fast"
+    strategy:
+      type: "plaintext"
+      includeFullFile: false
+    systemPrompt: "Briefly describe the main change in the following input."
+  rules:
+    - match: "*.lua"
+      profile: "smart"
+      strategy:
+        type: "plaintext"
+        includeFullFile: true
+      systemPrompt: "Describe the changes in the following Lua code."
+    - match: "LICENSE"
+      skip: true
+    - match: "*.md"
+      profile: "fast"
+      strategy:
+        type: "plaintext"
+        includeFullFile: false
+      systemPrompt: "Summarize the documentation changes."
+
+commit:
+  profile: "smart"
+  systemPrompt: |
+    You are an expert software engineer specializing in Neovim plugins.
+    Write a commit message in the Conventional Commits format based on the user's input.
+
+pr:
+  profile: "smart"
+  systemPrompt: |
+    You are an AI assistant writing a Pull Request description for a Neovim plugin.
+    Based on the user's input, write a clear and detailed PR description.
