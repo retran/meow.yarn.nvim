@@ -80,7 +80,9 @@ function call_hierarchy_strategy.fetch_children(client, item, direction_key, cal
     util.lsp.request_async(client, method, { item = item }, req_buf, function(results)
         if not results then return callback(nil) end
         local children_items = vim.tbl_map(function(result)
-            return direction_key == "callers" and result.from or result.to
+            -- return direction_key == "callers" and result.from or result.to
+            local raw_item = direction_key == "callers" and result.from or result.to
+            return { item = raw_item, fromRanges = result.fromRanges }
         end, results)
         callback(children_items)
     end)
@@ -92,9 +94,12 @@ end
 function call_hierarchy_strategy.generate_help_text(mappings)
     local dir_maps = {}
     -- Use display names from directions
-    table.insert(dir_maps, string.format("[%s]%s", mappings.show_super_hierarchy, call_hierarchy_strategy.directions.callers.display_name))
-    table.insert(dir_maps, string.format("[%s]%s", mappings.show_sub_hierarchy, call_hierarchy_strategy.directions.callees.display_name))
-    return string.format("[%s]Jump | [%s]Toggle | %s | [%s]Quit", mappings.jump, mappings.toggle, table.concat(dir_maps, " | "), mappings.quit)
+    table.insert(dir_maps,
+        string.format("[%s]%s", mappings.show_super_hierarchy, call_hierarchy_strategy.directions.callers.display_name))
+    table.insert(dir_maps,
+        string.format("[%s]%s", mappings.show_sub_hierarchy, call_hierarchy_strategy.directions.callees.display_name))
+    return string.format("[%s]Jump | [%s]Toggle | %s | [%s]Quit", mappings.jump, mappings.toggle,
+        table.concat(dir_maps, " | "), mappings.quit)
 end
 
 --- Renders a single line in the call hierarchy tree.
@@ -105,7 +110,7 @@ function call_hierarchy_strategy.render_node_line(node, hierarchy_instance)
     local cfg = get_config()
     local Line = require("nui.line")
     local Text = require("nui.text")
-    local item = node.lsp_item
+    local item = node.lsp_item.item
     local line = Line()
 
     line:append(string.rep("  ", math.max(0, node:get_depth() - 1)))
@@ -119,11 +124,12 @@ function call_hierarchy_strategy.render_node_line(node, hierarchy_instance)
         line:append("  ")
     end
 
-local lsp_kind_to_name = {
-    [6] = "method",
-    [12] = "func",
-    [13] = "variable",
-}    local icons = cfg.hierarchies.call_hierarchy.icons
+    local lsp_kind_to_name = {
+        [6] = "method",
+        [12] = "func",
+        [13] = "variable",
+    }
+    local icons = cfg.hierarchies.call_hierarchy.icons
     local kind_name = lsp_kind_to_name[item.kind]
     local icon = item.is_placeholder and cfg.icons.placeholder or (kind_name and icons[kind_name] or icons.default)
     line:append(icon .. " ")
@@ -142,13 +148,37 @@ local lsp_kind_to_name = {
 
     local file = item.uri and vim.uri_to_fname(item.uri)
     if file then
-        local sel = (item.selectionRange and item.selectionRange.start) or (item.range and item.range.start)
+        local sel = (node.lsp_item.fromRanges and node.lsp_item.fromRanges[1] and node.lsp_item.fromRanges[1].start) or
+            (item.selectionRange and item.selectionRange.start) or (item.range and item.range.start)
         local rhs = ("  %s"):format(util.short_path(file))
         if sel then rhs = rhs .. (":" .. (sel.line + 1)) end
         line:append(" ")
         line:append(Text(rhs, "Comment"))
+        if node.lsp_item.fromRanges and #node.lsp_item.fromRanges > 1 then
+            local referrences = " :" .. #node.lsp_item.fromRanges
+            line:append(" ")
+            line:append(Text(referrences, "ReferencesCount"))
+        end
     end
     return line
+end
+
+--- Custom function to get item key.
+---@param res table The LSP item.
+---@return string A unique key for the item.
+function call_hierarchy_strategy.get_caller_or_callee_item_key(res)
+    local item = res.item
+    if item and item.is_placeholder then
+        return "placeholder"
+    end
+
+    -- print("res:" .. res.item.name)
+
+    local sr = (res.fromRanges and res.fromRanges[1]) or item.selectionRange or item.range or {}
+    local s = sr.start or { line = -1, character = -1 }
+    local e = sr["end"] or { line = -1, character = -1 }
+    local uri, name, detail = item.uri or "?", item.name or "?", item.detail or ""
+    return string.format("%s|%s|%d:%d|%d:%d|%s", uri, name, s.line, s.character, e.line, e.character, detail)
 end
 
 return call_hierarchy_strategy

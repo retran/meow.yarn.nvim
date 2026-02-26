@@ -69,7 +69,7 @@ function Hierarchy:new(client, root_item, strategy, direction_key)
         },
     })
     instance.preview_popup = require("nui.popup")({
-        focusable = false,
+        focusable = true,
         border = { style = "rounded" },
         buf_options = { modifiable = false, readonly = true, buflisted = false },
         win_options = { number = true, relativenumber = true, cursorline = false },
@@ -78,10 +78,15 @@ function Hierarchy:new(client, root_item, strategy, direction_key)
 
     local Node = require("nui.tree").Node
     local get_item_key = instance.strategy.get_item_key or util.default_key_from_item
+    local wrap_item = direction_key:find("call")
+    local node = root_item
+    if wrap_item then
+        node = { item = root_item }
+    end
     local root_node_obj = Node({
         id = get_item_key(root_item),
         text = root_item.name,
-        lsp_item = root_item,
+        lsp_item = node,
         dir_key = direction_key,
         fetched = false,
         loading = root_item.is_placeholder or false,
@@ -187,7 +192,10 @@ function Hierarchy:_create_layout()
     local preview_height = string.format("%d%%", cfg.window.preview_height_ratio * 100)
     local tree_height = string.format("%d%%", (1 - cfg.window.preview_height_ratio) * 100)
     return Layout({ position = "50%", size = { width = w, height = h }, relative = "editor" },
-        Layout.Box({ Layout.Box(self.tree_popup, { size = tree_height }), Layout.Box(self.preview_popup, { size = preview_height }) }, { dir = "col" }))
+        Layout.Box(
+            { Layout.Box(self.tree_popup, { size = tree_height }), Layout.Box(self.preview_popup,
+                { size = preview_height }) },
+            { dir = "col" }))
 end
 
 --- Sets up the keymaps for the hierarchy window.
@@ -201,7 +209,8 @@ function Hierarchy:_setup_keymaps()
     map(cfg.mappings.quit, function() self:unmount() end, "Quit")
     map(cfg.mappings.jump, function()
         local node = self.tree:get_node()
-        if node and node.lsp_item and not node.lsp_item.is_placeholder then
+        if (node and node.lsp_item and not node.lsp_item.is_placeholder)
+            or (node and node.lsp_item and node.lsp_item.item and not node.lsp_item.item.is_placeholder) then
             local item_to_jump = node.lsp_item
             self:unmount()
             util.jump_to_item(item_to_jump, self.client)
@@ -211,7 +220,7 @@ function Hierarchy:_setup_keymaps()
     local expand_action = function(expand_only)
         return function()
             local node = self.tree:get_node()
-            if not node or (node.lsp_item and node.lsp_item.is_placeholder) then return end
+            if not node or (node.lsp_item and node.lsp_item.item and node.lsp_item.is_placeholder) then return end
             if expand_only and node:is_expanded() then return end
             self:update_node(node, 1)
         end
@@ -219,8 +228,22 @@ function Hierarchy:_setup_keymaps()
     map(cfg.mappings.toggle, expand_action(false), "Toggle expand/collapse")
     map(cfg.mappings.expand, expand_action(true), "Expand")
     map(cfg.mappings.expand_alt, expand_action(true), "Expand (alt)")
-    map(cfg.mappings.collapse, function() local n = self.tree:get_node() if n then n:collapse() self.tree:render() end end, "Collapse")
-    map(cfg.mappings.collapse_alt, function() local n = self.tree:get_node() if n then n:collapse() self.tree:render() end end, "Collapse (alt)")
+    map(cfg.mappings.collapse,
+        function()
+            local n = self.tree:get_node()
+            if n then
+                n:collapse()
+                self.tree:render()
+            end
+        end, "Collapse")
+    map(cfg.mappings.collapse_alt,
+        function()
+            local n = self.tree:get_node()
+            if n then
+                n:collapse()
+                self.tree:render()
+            end
+        end, "Collapse (alt)")
 
     local function switch_direction(new_direction_key)
         local node = self.tree:get_node()
@@ -248,7 +271,6 @@ function Hierarchy:_setup_keymaps()
     end, "Show Super-Hierarchy")
 end
 
-
 --- Fetches children for a node and updates the tree.
 ---@param node table The NuiTree node to update.
 ---@param depth number The depth to recursively expand.
@@ -272,48 +294,50 @@ function Hierarchy:update_node(node, depth)
     self.tree:render()
 
     local node_id = node:get_id()
-    self.active_requests[node_id] = self.strategy.fetch_children(self.client, node.lsp_item, self.direction_key, function(children)
-        self.active_requests[node_id] = nil
-        if not self:is_valid() then return end
-        local parent = self.tree:get_node(node_id)
-        if not parent then return end
+    self.active_requests[node_id] = self.strategy.fetch_children(self.client, node.lsp_item.item, self.direction_key,
+        function(children)
+            self.active_requests[node_id] = nil
+            if not self:is_valid() then return end
+            local parent = self.tree:get_node(node_id)
+            if not parent then return end
 
-        parent.loading = false
-        parent.fetched = true
-        parent.has_more = (type(children) == "table") and (#children > 0)
+            parent.loading = false
+            parent.fetched = true
+            parent.has_more = (type(children) == "table") and (#children > 0)
 
-        local Node = require("nui.tree").Node
-        local get_item_key = self.strategy.get_item_key or util.default_key_from_item
-        local child_nodes = {}
-        if parent.has_more then
-            for _, child_item in ipairs(children) do
-                local base_id = get_item_key(child_item)
-                local path_dependent_id = node_id .. "->" .. base_id
-                table.insert(child_nodes, Node({
-                    id = util.unique_id_for(self.tree, path_dependent_id),
-                    text = child_item.name,
-                    lsp_item = child_item,
-                    dir_key = parent.dir_key,
-                    fetched = false,
-                    loading = false,
-                    has_more = true,
-                }))
+            local Node = require("nui.tree").Node
+            -- local get_item_key = self.strategy.get_item_key or util.default_key_from_item
+            local get_item_key = self.strategy.get_caller_or_callee_item_key or util.default_key_from_item
+            local child_nodes = {}
+            if parent.has_more then
+                for _, child_item in ipairs(children) do
+                    local base_id = get_item_key(child_item)
+                    local path_dependent_id = node_id .. "->" .. base_id
+                    table.insert(child_nodes, Node({
+                        id = util.unique_id_for(self.tree, path_dependent_id),
+                        text = child_item.item.name,
+                        lsp_item = child_item,
+                        dir_key = parent.dir_key,
+                        fetched = false,
+                        loading = false,
+                        has_more = true,
+                    }))
+                end
             end
-        end
-        self.tree:set_nodes(child_nodes, node_id)
-        if not parent:is_expanded() then parent:expand() end
-        self.tree:render()
+            self.tree:set_nodes(child_nodes, node_id)
+            if not parent:is_expanded() then parent:expand() end
+            self.tree:render()
 
-        if depth > 1 and parent.has_more then
-            for _, child_node in ipairs(self.tree:get_nodes(parent:get_id())) do
-                vim.schedule(function()
-                    if self:is_valid() then
-                        self:update_node(child_node, depth - 1)
-                    end
-                end)
+            if depth > 1 and parent.has_more then
+                for _, child_node in ipairs(self.tree:get_nodes(parent:get_id())) do
+                    vim.schedule(function()
+                        if self:is_valid() then
+                            self:update_node(child_node, depth - 1)
+                        end
+                    end)
+                end
             end
-        end
-    end)
+        end)
 end
 
 --- Sets up autocommands for cleaning up the hierarchy window.
@@ -332,21 +356,23 @@ function Hierarchy:_setup_preview()
     local preview_ns = vim.api.nvim_create_namespace(K.PREVIEW_NAMESPACE)
     local update_preview = function()
         local node = self.tree:get_node()
-        if not (self:is_valid() and node and node.lsp_item and node.lsp_item.uri and not node.lsp_item.is_placeholder) then
+        if not (self:is_valid() and node and node.lsp_item and node.lsp_item.item and node.lsp_item.item.uri and not node.lsp_item.item.is_placeholder) then
             return
         end
+
         local pbuf = self.preview_popup.bufnr
         if not (pbuf and vim.api.nvim_buf_is_valid(pbuf)) then
             return
         end
+
         pcall(function()
-            local lsp_item = node.lsp_item
+            local lsp_item = node.lsp_item.item
             local source_bufnr = vim.uri_to_bufnr(lsp_item.uri)
             if not vim.api.nvim_buf_is_loaded(source_bufnr) then
                 vim.fn.bufload(source_bufnr)
             end
             vim.bo[pbuf].filetype = vim.bo[source_bufnr].filetype
-            local start_line_0 = (lsp_item.selectionRange or lsp_item.range).start.line
+            local start_line_0 = (node.lsp_item.fromRanges[1] or lsp_item.selectionRange or lsp_item.range).start.line
             local cfg = get_config()
             local ctx = cfg.preview_context_lines
             local first_line = math.max(0, start_line_0 - ctx)
