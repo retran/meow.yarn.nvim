@@ -2,6 +2,18 @@
 
 All notable changes to meow.yarn.nvim are documented here.
 
+## [Unreleased] - v0.1.4
+
+### Added
+
+- **Search / filter** — press `/` inside the hierarchy window to filter nodes by name (case-insensitive substring); non-matching nodes are dimmed; the active query is shown in the bottom-left border; cleared when navigating to a new root (`mappings.filter`, default `/`)
+- **Re-open last hierarchy** — `:MeowYarn last` and `<Plug>(MeowYarnLast)` re-open the most recent hierarchy session (same symbol, strategy and direction)
+- **Copy path to clipboard** — press `y` on any node to yank its `file:line` to the `+` and `"` registers (`mappings.yank_path`, default `y`)
+- **Node position indicator** — current row / total visible nodes displayed in the top-right corner of the tree border, updated on every cursor move and tree render
+- **Expand all / collapse all** — `zO` expands every fetched node, `zC` collapses all (`mappings.expand_all` / `mappings.collapse_all`)
+- **Horizontal layout** — set `window.layout = "horizontal"` to place the preview pane to the right of the tree instead of below it (default `"vertical"`)
+- **Keep open after jump** — set `keep_open_on_jump = true` to stay in the hierarchy window after pressing `<CR>` (default `false`)
+
 ## [0.1.3] - 2026-04-12
 
 ### Fixed

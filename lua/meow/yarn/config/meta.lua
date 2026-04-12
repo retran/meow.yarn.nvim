@@ -38,9 +38,10 @@
 ---@field direction string|nil The hierarchy direction key (e.g. "supertypes", "callers").
 
 ---@class meow.yarn.Config
----@field window? { width?: number, height?: number, border?: string, preview_height_ratio?: number }
+---@field window? { width?: number, height?: number, border?: string, preview_height_ratio?: number, layout?: "vertical"|"horizontal" }
 ---@field icons? { loading?: string, placeholder?: string, animation_frames?: string[] }
----@field mappings? { jump?: string, toggle?: string, expand?: string, expand_alt?: string, collapse?: string, collapse_alt?: string, show_super_hierarchy?: string, show_sub_hierarchy?: string, quit?: string, breadcrumb_back?: string|nil }
+---@field mappings? { jump?: string, toggle?: string, expand?: string, expand_alt?: string, collapse?: string, collapse_alt?: string, show_super_hierarchy?: string, show_sub_hierarchy?: string, quit?: string, breadcrumb_back?: string|nil, yank_path?: string|nil, expand_all?: string|nil, collapse_all?: string|nil, filter?: string|nil }
+---@field keep_open_on_jump? boolean
 ---@field expand_depth? number
 ---@field preview_context_lines? number
 ---@field animation_speed? number

@@ -35,6 +35,7 @@ local config_internal = nil
 local util = nil
 local Hierarchy = nil
 local strategies = nil
+local state = nil
 
 -- Initialize modules lazily when first needed
 local function ensure_loaded()
@@ -43,6 +44,7 @@ local function ensure_loaded()
         config_internal = require("meow.yarn.config.internal")
         util = require("meow.yarn.util")
         Hierarchy = require("meow.yarn.hierarchy")
+        state = require("meow.yarn.state")
 
         strategies = {
             type_hierarchy = require("meow.yarn.strategies.type"),
@@ -64,8 +66,9 @@ local _private = {}
 ---@param client table The LSP client.
 ---@param source_win number The source window ID.
 ---@param strategy table The hierarchy strategy to use.
+---@param strategy_name string The strategy name key.
 ---@param direction_key string The direction of the hierarchy.
-function _private.fetch_root_and_build_tree(placeholder, client, source_win, strategy, direction_key)
+function _private.fetch_root_and_build_tree(placeholder, client, source_win, strategy, strategy_name, direction_key)
     if not placeholder:is_valid() then return end
     strategy.prepare_root_item(client, source_win, function(root_item)
         if not placeholder:is_valid() then return end
@@ -73,7 +76,7 @@ function _private.fetch_root_and_build_tree(placeholder, client, source_win, str
         if not root_item then
             return vim.notify(strategy.name .. ": No symbol found under cursor.", vim.log.levels.WARN)
         end
-        M.open_from_item(root_item, strategy, direction_key)
+        M.open_from_item(root_item, strategy, direction_key, strategy_name)
     end)
 end
 
@@ -81,7 +84,8 @@ end
 ---@param item table The root LSP item.
 ---@param strategy table The hierarchy strategy.
 ---@param direction_key string The direction of the hierarchy.
-function M.open_from_item(item, strategy, direction_key)
+---@param strategy_name? string The strategy name key, used to persist the session for re-opening.
+function M.open_from_item(item, strategy, direction_key, strategy_name)
     ensure_loaded()
     local bufnr = item.uri and vim.uri_to_bufnr(item.uri) or vim.api.nvim_get_current_buf()
     if not util or not util.lsp then
@@ -94,12 +98,31 @@ function M.open_from_item(item, strategy, direction_key)
     if not Hierarchy then
         ensure_loaded()
     end
+    -- Persist last session for :MeowYarn last
+    if strategy_name then
+        state.G.last_session = { item = item, strategy_name = strategy_name, direction_key = direction_key }
+    end
     local hierarchy = Hierarchy:new(client, item, strategy, direction_key)
     hierarchy:mount()
     local root_node = hierarchy.tree:get_node(1)
     if root_node then
         hierarchy:update_node(root_node, get_config().expand_depth)
     end
+end
+
+--- Re-opens the last opened hierarchy session (same item, strategy, and direction).
+--- Does nothing if no session has been opened yet.
+function M.reopen_last()
+    ensure_loaded()
+    local session = state.G.last_session
+    if not session then
+        return vim.notify("MeowYarn: No previous hierarchy session to re-open.", vim.log.levels.WARN)
+    end
+    local strategy = strategies[session.strategy_name]
+    if not strategy then
+        return vim.notify("MeowYarn: Unknown strategy '" .. session.strategy_name .. "'", vim.log.levels.ERROR)
+    end
+    M.open_from_item(session.item, strategy, session.direction_key, session.strategy_name)
 end
 
 --- Opens a hierarchy tree for the symbol under the cursor in the current window.
@@ -133,7 +156,7 @@ function M.open_tree(strategy_name, direction_key)
     local placeholder_hierarchy = Hierarchy:new(client, placeholder_item, strategy, direction_key)
     placeholder_hierarchy:mount()
     vim.schedule(function()
-        _private.fetch_root_and_build_tree(placeholder_hierarchy, client, source_win, strategy, direction_key)
+        _private.fetch_root_and_build_tree(placeholder_hierarchy, client, source_win, strategy, strategy_name, direction_key)
     end)
 end
 

@@ -30,12 +30,13 @@ local M = {}
 
 ---@class meow.yarn.InternalConfig
 local default_config = {
-    ---@type { width: number, height: number, border: string, preview_height_ratio: number }
+    ---@type { width: number, height: number, border: string, preview_height_ratio: number, layout: string }
     window = {
         width = 0.8,
         height = 0.85,
         border = "rounded",
         preview_height_ratio = 0.35,
+        layout = "vertical",
     },
     ---@type { loading: string, placeholder: string, animation_frames: string[] }
     icons = {
@@ -43,7 +44,7 @@ local default_config = {
         placeholder = "",
         animation_frames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
     },
-    ---@type { jump: string, toggle: string, expand: string, expand_alt: string, collapse: string, collapse_alt: string, show_super_hierarchy: string, show_sub_hierarchy: string, quit: string, breadcrumb_back: string|nil }
+    ---@type { jump: string, toggle: string, expand: string, expand_alt: string, collapse: string, collapse_alt: string, show_super_hierarchy: string, show_sub_hierarchy: string, quit: string, breadcrumb_back: string|nil, yank_path: string|nil, expand_all: string|nil, collapse_all: string|nil, filter: string|nil }
     mappings = {
         jump = "<CR>",
         toggle = "<Tab>",
@@ -55,7 +56,13 @@ local default_config = {
         show_sub_hierarchy = "J",
         quit = "q",
         breadcrumb_back = "<BS>",
+        yank_path = "y",
+        expand_all = "zO",
+        collapse_all = "zC",
+        filter = "/",
     },
+    ---@type boolean
+    keep_open_on_jump = false,
     ---@type number
     expand_depth = 3,
     ---@type number

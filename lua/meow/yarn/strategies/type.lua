@@ -120,7 +120,23 @@ function type_hierarchy_strategy.render_node_line(node, hierarchy_instance)
 
     -- Try user-supplied custom renderer first
     local custom_line = util.try_custom_render(node, item, icon, hierarchy_instance)
-    if custom_line then return custom_line end
+    if custom_line then
+        if node._filtered_out then
+            -- wrap in Comment highlight to dim filtered nodes
+            local Line = require("nui.line")
+            local Text = require("nui.text")
+            local dimmed = Line()
+            dimmed:append(Text(tostring(custom_line), "Comment"))
+            return dimmed
+        end
+        return custom_line
+    end
+
+    if node._filtered_out then
+        local dim_line = Line()
+        dim_line:append(string.rep("  ", math.max(0, node:get_depth() - 1)) .. "  " .. icon .. " " .. item.name, "Comment")
+        return dim_line
+    end
 
     line:append(icon .. " ")
     line:append(item.name)

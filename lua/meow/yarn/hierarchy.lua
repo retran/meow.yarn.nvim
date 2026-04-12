@@ -58,6 +58,34 @@ local function update_breadcrumb_display(self)
     pcall(self.tree_popup.border.set_text, self.tree_popup.border, "top", text, "left")
 end
 
+--- Counts the total visible (rendered) nodes in the tree.
+---@param self table The Hierarchy instance.
+---@return number total
+local function count_visible_nodes(self)
+    local count = 0
+    local function walk(nodes)
+        for _, node in ipairs(nodes) do
+            count = count + 1
+            if node:is_expanded() then
+                walk(self.tree:get_nodes(node:get_id()))
+            end
+        end
+    end
+    walk(self.tree:get_nodes())
+    return count
+end
+
+--- Updates the right side of the top border with the cursor position indicator.
+---@param self table The Hierarchy instance.
+local function update_position_display(self)
+    if not self:is_valid() then return end
+    if not (self.tree_popup.border and self.tree_popup.border.set_text) then return end
+    local total = count_visible_nodes(self)
+    local row = vim.api.nvim_win_get_cursor(self.tree_popup.winid)[1]
+    local text = string.format(" %d/%d ", row, total)
+    pcall(self.tree_popup.border.set_text, self.tree_popup.border, "top", text, "right")
+end
+
 --- Creates a new Hierarchy instance.
 ---@param client table The LSP client.
 ---@param root_item table The root item of the hierarchy.
@@ -142,6 +170,7 @@ function Hierarchy:mount()
     -- Defer until after layout:mount() has assigned tree_popup.winid
     vim.schedule(function()
         update_breadcrumb_display(self)
+        update_position_display(self)
     end)
 end
 
@@ -181,6 +210,8 @@ function Hierarchy:reset(root_item, direction_key, skip_history)
         table.insert(self.history, { item = root_item, direction_key = direction_key })
         update_breadcrumb_display(self)
     end
+
+    self.filter_text = nil
 
     local Node = require("nui.tree").Node
     local get_item_key = self.strategy.get_item_key or util.default_key_from_item
@@ -229,10 +260,22 @@ function Hierarchy:_create_layout()
         h = math.floor(vim.o.lines * h)
     end
     local Layout = require("nui.layout")
-    local preview_height = string.format("%d%%", cfg.window.preview_height_ratio * 100)
-    local tree_height = string.format("%d%%", (1 - cfg.window.preview_height_ratio) * 100)
-    return Layout({ position = "50%", size = { width = w, height = h }, relative = "editor" },
-        Layout.Box({ Layout.Box(self.tree_popup, { size = tree_height }), Layout.Box(self.preview_popup, { size = preview_height }) }, { dir = "col" }))
+    local preview_ratio = cfg.window.preview_height_ratio
+    local layout_dir = cfg.window.layout or "vertical"
+
+    if layout_dir == "horizontal" then
+        -- Side-by-side: tree on left, preview on right
+        local preview_w = string.format("%d%%", preview_ratio * 100)
+        local tree_w = string.format("%d%%", (1 - preview_ratio) * 100)
+        return Layout({ position = "50%", size = { width = w, height = h }, relative = "editor" },
+            Layout.Box({ Layout.Box(self.tree_popup, { size = tree_w }), Layout.Box(self.preview_popup, { size = preview_w }) }, { dir = "row" }))
+    else
+        -- Stacked vertically: tree on top, preview on bottom (default)
+        local preview_height = string.format("%d%%", preview_ratio * 100)
+        local tree_height = string.format("%d%%", (1 - preview_ratio) * 100)
+        return Layout({ position = "50%", size = { width = w, height = h }, relative = "editor" },
+            Layout.Box({ Layout.Box(self.tree_popup, { size = tree_height }), Layout.Box(self.preview_popup, { size = preview_height }) }, { dir = "col" }))
+    end
 end
 
 --- Sets up the keymaps for the hierarchy window.
@@ -244,15 +287,38 @@ function Hierarchy:_setup_keymaps()
     end
 
     map(cfg.mappings.quit, function() self:unmount() end, "Quit")
+
+    -- Jump to definition
     map(cfg.mappings.jump, function()
         local node = self.tree:get_node()
         if node and node.lsp_item and not node.lsp_item.is_placeholder then
             local item_to_jump = node.lsp_item
-            self:unmount()
-            util.jump_to_item(item_to_jump, self.client)
+            if cfg.keep_open_on_jump then
+                util.jump_to_item(item_to_jump, self.client)
+            else
+                self:unmount()
+                util.jump_to_item(item_to_jump, self.client)
+            end
         end
     end, "Jump to definition")
 
+    -- Yank node file:line to clipboard
+    if type(cfg.mappings.yank_path) == "string" and cfg.mappings.yank_path ~= "" then
+        map(cfg.mappings.yank_path, function()
+            local node = self.tree:get_node()
+            if node and node.lsp_item and node.lsp_item.uri and not node.lsp_item.is_placeholder then
+                local item = node.lsp_item
+                local file = vim.uri_to_fname(item.uri)
+                local sel = (item.selectionRange and item.selectionRange.start) or (item.range and item.range.start)
+                local text = sel and (file .. ":" .. (sel.line + 1)) or file
+                vim.fn.setreg("+", text)
+                vim.fn.setreg('"', text)
+                vim.notify("Copied: " .. text, vim.log.levels.INFO)
+            end
+        end, "Yank file path to clipboard")
+    end
+
+    -- Expand / collapse
     local expand_action = function(expand_only)
         return function()
             local node = self.tree:get_node()
@@ -264,10 +330,29 @@ function Hierarchy:_setup_keymaps()
     map(cfg.mappings.toggle, expand_action(false), "Toggle expand/collapse")
     map(cfg.mappings.expand, expand_action(true), "Expand")
     map(cfg.mappings.expand_alt, expand_action(true), "Expand (alt)")
-    map(cfg.mappings.collapse, function() local n = self.tree:get_node() if n then n:collapse() self.tree:render() end end, "Collapse")
-    map(cfg.mappings.collapse_alt, function() local n = self.tree:get_node() if n then n:collapse() self.tree:render() end end, "Collapse (alt)")
+    map(cfg.mappings.collapse, function()
+        local n = self.tree:get_node()
+        if n then n:collapse() self.tree:render() update_position_display(self) end
+    end, "Collapse")
+    map(cfg.mappings.collapse_alt, function()
+        local n = self.tree:get_node()
+        if n then n:collapse() self.tree:render() update_position_display(self) end
+    end, "Collapse (alt)")
 
-    -- Set nil to disable the breadcrumb-back keymap entirely.
+    -- Expand all / collapse all
+    if type(cfg.mappings.expand_all) == "string" and cfg.mappings.expand_all ~= "" then
+        map(cfg.mappings.expand_all, function() self:_expand_collapse_all(true) end, "Expand all nodes")
+    end
+    if type(cfg.mappings.collapse_all) == "string" and cfg.mappings.collapse_all ~= "" then
+        map(cfg.mappings.collapse_all, function() self:_expand_collapse_all(false) end, "Collapse all nodes")
+    end
+
+    -- Search / filter
+    if type(cfg.mappings.filter) == "string" and cfg.mappings.filter ~= "" then
+        map(cfg.mappings.filter, function() self:_enter_filter_mode() end, "Filter nodes")
+    end
+
+    -- Breadcrumb back
     if type(cfg.mappings.breadcrumb_back) == "string" and cfg.mappings.breadcrumb_back ~= "" then
         map(cfg.mappings.breadcrumb_back, function() self:breadcrumb_back() end, "Navigate back in breadcrumbs")
     end
@@ -296,6 +381,63 @@ function Hierarchy:_setup_keymaps()
             switch_direction("callers")
         end
     end, "Show Super-Hierarchy")
+end
+
+--- Recursively expands or collapses all nodes in the tree.
+---@param expand boolean true to expand, false to collapse.
+function Hierarchy:_expand_collapse_all(expand)
+    local function walk(nodes)
+        for _, node in ipairs(nodes) do
+            if expand then
+                if node.fetched and not node:is_expanded() then node:expand() end
+            else
+                if node:is_expanded() then node:collapse() end
+            end
+            walk(self.tree:get_nodes(node:get_id()))
+        end
+    end
+    walk(self.tree:get_nodes())
+    self.tree:render()
+    update_position_display(self)
+end
+
+--- Prompts for a filter string and highlights / hides non-matching nodes.
+function Hierarchy:_enter_filter_mode()
+    vim.ui.input({ prompt = "Filter: ", default = self.filter_text or "" }, function(input)
+        if not self:is_valid() then return end
+        self.filter_text = (input and input ~= "") and input or nil
+        self:_apply_filter()
+    end)
+end
+
+--- Applies self.filter_text to the tree, showing only matching nodes.
+function Hierarchy:_apply_filter()
+    local query = self.filter_text and self.filter_text:lower()
+
+    local function matches(node)
+        if not query then return true end
+        local name = node.text and node.text:lower() or ""
+        return name:find(query, 1, true) ~= nil
+    end
+
+    local function walk(nodes)
+        for _, node in ipairs(nodes) do
+            -- Always walk children regardless of match
+            walk(self.tree:get_nodes(node:get_id()))
+            -- Show/hide: nui tree doesn't have a native hide API,
+            -- so we mark nodes and let prepare_node render them dimmed.
+            node._filtered_out = query and not matches(node) or false
+        end
+    end
+    walk(self.tree:get_nodes())
+    self.tree:render()
+
+    -- Update border to show active filter
+    if self.tree_popup.border and self.tree_popup.border.set_text then
+        local label = query and (" /" .. query .. "/ ") or ""
+        pcall(self.tree_popup.border.set_text, self.tree_popup.border, "bottom", label, "left")
+    end
+    update_position_display(self)
 end
 
 
@@ -353,6 +495,7 @@ function Hierarchy:update_node(node, depth)
         self.tree:set_nodes(child_nodes, node_id)
         if not parent:is_expanded() then parent:expand() end
         self.tree:render()
+        update_position_display(self)
 
         if depth > 1 and parent.has_more then
             for _, child_node in ipairs(self.tree:get_nodes(parent:get_id())) do
@@ -424,6 +567,7 @@ function Hierarchy:_setup_preview()
     end
     local on_cursor_moved = function()
         update_cursor_sign()
+        update_position_display(self)
         if self.debounce_timer then vim.fn.timer_stop(self.debounce_timer) end
         self.debounce_timer = vim.fn.timer_start(100, function() vim.schedule(update_preview) end)
     end

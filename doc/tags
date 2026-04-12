@@ -6,6 +6,7 @@ meow-yarn-configuration	meow-yarn.txt	/*meow-yarn-configuration*
 meow-yarn-contents	meow-yarn.txt	/*meow-yarn-contents*
 meow-yarn-contributing	meow-yarn.txt	/*meow-yarn-contributing*
 meow-yarn-features	meow-yarn.txt	/*meow-yarn-features*
+meow-yarn-filter	meow-yarn.txt	/*meow-yarn-filter*
 meow-yarn-getting-started	meow-yarn.txt	/*meow-yarn-getting-started*
 meow-yarn-in-window-mappings	meow-yarn.txt	/*meow-yarn-in-window-mappings*
 meow-yarn-installation	meow-yarn.txt	/*meow-yarn-installation*
