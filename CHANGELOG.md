@@ -13,6 +13,9 @@ All notable changes to meow.yarn.nvim are documented here.
 - **Expand all / collapse all** — `zO` expands every fetched node, `zC` collapses all (`mappings.expand_all` / `mappings.collapse_all`)
 - **Horizontal layout** — set `window.layout = "horizontal"` to place the preview pane to the right of the tree instead of below it (default `"vertical"`)
 - **Keep open after jump** — set `keep_open_on_jump = true` to stay in the hierarchy window after pressing `<CR>` (default `false`)
+- **Scroll preview** — `<C-d>` / `<C-u>` scroll the preview pane while focus stays in the tree window (`mappings.preview_scroll_down` / `mappings.preview_scroll_up`)
+- **Sort order toggle** — press `s` to cycle node sort order: `lsp` (LSP result order, default) → `alpha` (alphabetical) → `file` (by file path and line); current mode shown in the bottom-right border (`mappings.sort`)
+- **Sticky cursor on back-navigation** — pressing `<BS>` now restores the cursor to the node that was the root of the session just left, so you land exactly where you drilled in from
 
 ## [0.1.3] - 2026-04-12
 

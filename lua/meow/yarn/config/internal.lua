@@ -44,7 +44,7 @@ local default_config = {
         placeholder = "",
         animation_frames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
     },
-    ---@type { jump: string, toggle: string, expand: string, expand_alt: string, collapse: string, collapse_alt: string, show_super_hierarchy: string, show_sub_hierarchy: string, quit: string, breadcrumb_back: string|nil, yank_path: string|nil, expand_all: string|nil, collapse_all: string|nil, filter: string|nil }
+    ---@type { jump: string, toggle: string, expand: string, expand_alt: string, collapse: string, collapse_alt: string, show_super_hierarchy: string, show_sub_hierarchy: string, quit: string, breadcrumb_back: string|nil, yank_path: string|nil, expand_all: string|nil, collapse_all: string|nil, filter: string|nil, preview_scroll_down: string|nil, preview_scroll_up: string|nil, sort: string|nil }
     mappings = {
         jump = "<CR>",
         toggle = "<Tab>",
@@ -60,6 +60,9 @@ local default_config = {
         expand_all = "zO",
         collapse_all = "zC",
         filter = "/",
+        preview_scroll_down = "<C-d>",
+        preview_scroll_up = "<C-u>",
+        sort = "s",
     },
     ---@type boolean
     keep_open_on_jump = false,

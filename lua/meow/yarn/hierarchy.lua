@@ -86,6 +86,40 @@ local function update_position_display(self)
     pcall(self.tree_popup.border.set_text, self.tree_popup.border, "top", text, "right")
 end
 
+--- Updates the bottom-right border text with the current sort order indicator.
+---@param self table The Hierarchy instance.
+local function update_sort_display(self)
+    if not self:is_valid() then return end
+    if not (self.tree_popup.border and self.tree_popup.border.set_text) then return end
+    local labels = { lsp = " lsp ", alpha = " α ", file = " file " }
+    local text = labels[self.sort_order] or ""
+    pcall(self.tree_popup.border.set_text, self.tree_popup.border, "bottom", text, "right")
+end
+
+--- Finds the rendered line number (1-based) for a node id in the visible tree.
+---@param self table The Hierarchy instance.
+---@param target_id string The node id to search for.
+---@return number|nil line number, or nil if not found.
+local function find_node_row(self, target_id)
+    local row = 0
+    local found = nil
+    local function walk(nodes)
+        for _, node in ipairs(nodes) do
+            row = row + 1
+            if node:get_id() == target_id then
+                found = row
+                return
+            end
+            if node:is_expanded() then
+                walk(self.tree:get_nodes(node:get_id()))
+                if found then return end
+            end
+        end
+    end
+    walk(self.tree:get_nodes())
+    return found
+end
+
 --- Creates a new Hierarchy instance.
 ---@param client table The LSP client.
 ---@param root_item table The root item of the hierarchy.
@@ -99,7 +133,8 @@ function Hierarchy:new(client, root_item, strategy, direction_key)
     instance.strategy = strategy
     instance.direction_key = direction_key
     instance.active_requests = {}
-    -- Navigation history: list of { item = <lsp_item>, direction_key = <string> }
+    instance.sort_order = "lsp"
+    -- Navigation history: list of { item = <lsp_item>, direction_key = <string>, cursor_node_id = <string|nil> }
     instance.history = { { item = root_item, direction_key = direction_key } }
 
     local help_text = instance.strategy.generate_help_text(cfg.mappings)
@@ -171,6 +206,7 @@ function Hierarchy:mount()
     vim.schedule(function()
         update_breadcrumb_display(self)
         update_position_display(self)
+        update_sort_display(self)
     end)
 end
 
@@ -199,7 +235,8 @@ end
 ---@param root_item table The new root LSP item.
 ---@param direction_key string The new direction key.
 ---@param skip_history? boolean When true, do not append to history (used for back navigation).
-function Hierarchy:reset(root_item, direction_key, skip_history)
+---@param restore_node_id? string When set, restore cursor to this node id after render.
+function Hierarchy:reset(root_item, direction_key, skip_history, restore_node_id)
     for _, request_id in pairs(self.active_requests) do
         self.client.cancel_request(request_id)
     end
@@ -207,6 +244,12 @@ function Hierarchy:reset(root_item, direction_key, skip_history)
     self.direction_key = direction_key
 
     if not skip_history then
+        -- Record the current cursor node in the current (soon to be previous) history entry,
+        -- so breadcrumb_back() can restore the cursor to the node we drilled into.
+        local cur_node = self.tree:get_node()
+        if cur_node and #self.history > 0 then
+            self.history[#self.history].cursor_node_id = cur_node:get_id()
+        end
         table.insert(self.history, { item = root_item, direction_key = direction_key })
         update_breadcrumb_display(self)
     end
@@ -233,7 +276,7 @@ function Hierarchy:reset(root_item, direction_key, skip_history)
     vim.schedule(function()
         if self:is_valid() then
             local cfg = get_config()
-            self:update_node(new_root_node, cfg.expand_depth)
+            self:update_node(new_root_node, cfg.expand_depth, restore_node_id)
         end
     end)
 end
@@ -241,10 +284,11 @@ end
 --- Navigates back one step in the breadcrumb history.
 function Hierarchy:breadcrumb_back()
     if #self.history <= 1 then return end
-    table.remove(self.history, #self.history)
+    local leaving = table.remove(self.history, #self.history)
     local prev = self.history[#self.history]
-    -- skip_history=true so reset() does not append prev again; it is already in place.
-    self:reset(prev.item, prev.direction_key, true)
+    -- Restore cursor to the node we had drilled into (i.e. the root of the session we're leaving).
+    local restore_id = leaving.item and (self.strategy.get_item_key or util.default_key_from_item)(leaving.item)
+    self:reset(prev.item, prev.direction_key, true, restore_id)
     update_breadcrumb_display(self)
 end
 
@@ -352,6 +396,32 @@ function Hierarchy:_setup_keymaps()
         map(cfg.mappings.filter, function() self:_enter_filter_mode() end, "Filter nodes")
     end
 
+    -- Scroll preview pane without leaving the tree window
+    if type(cfg.mappings.preview_scroll_down) == "string" and cfg.mappings.preview_scroll_down ~= "" then
+        map(cfg.mappings.preview_scroll_down, function()
+            if self.preview_popup and self.preview_popup.winid and vim.api.nvim_win_is_valid(self.preview_popup.winid) then
+                vim.api.nvim_win_call(self.preview_popup.winid, function() vim.cmd("normal! \004") end)
+            end
+        end, "Scroll preview down")
+    end
+    if type(cfg.mappings.preview_scroll_up) == "string" and cfg.mappings.preview_scroll_up ~= "" then
+        map(cfg.mappings.preview_scroll_up, function()
+            if self.preview_popup and self.preview_popup.winid and vim.api.nvim_win_is_valid(self.preview_popup.winid) then
+                vim.api.nvim_win_call(self.preview_popup.winid, function() vim.cmd("normal! \021") end)
+            end
+        end, "Scroll preview up")
+    end
+
+    -- Cycle sort order: lsp → alpha → file → lsp
+    if type(cfg.mappings.sort) == "string" and cfg.mappings.sort ~= "" then
+        map(cfg.mappings.sort, function()
+            local cycle = { lsp = "alpha", alpha = "file", file = "lsp" }
+            self.sort_order = cycle[self.sort_order] or "lsp"
+            self:_resort_tree()
+            vim.notify("MeowYarn: sort order → " .. self.sort_order, vim.log.levels.INFO)
+        end, "Cycle sort order")
+    end
+
     -- Breadcrumb back
     if type(cfg.mappings.breadcrumb_back) == "string" and cfg.mappings.breadcrumb_back ~= "" then
         map(cfg.mappings.breadcrumb_back, function() self:breadcrumb_back() end, "Navigate back in breadcrumbs")
@@ -401,6 +471,49 @@ function Hierarchy:_expand_collapse_all(expand)
     update_position_display(self)
 end
 
+--- Sorts a list of nui tree nodes according to self.sort_order.
+---@param nodes table List of NuiTree nodes.
+---@return table Sorted list.
+function Hierarchy:_sort_nodes(nodes)
+    if self.sort_order == "lsp" then
+        return nodes -- preserve LSP result order
+    end
+    local sorted = vim.list_slice(nodes, 1, #nodes)
+    if self.sort_order == "alpha" then
+        table.sort(sorted, function(a, b)
+            return (a.text or ""):lower() < (b.text or ""):lower()
+        end)
+    elseif self.sort_order == "file" then
+        table.sort(sorted, function(a, b)
+            local fa = (a.lsp_item and a.lsp_item.uri) or ""
+            local fb = (b.lsp_item and b.lsp_item.uri) or ""
+            if fa ~= fb then return fa < fb end
+            local la = a.lsp_item and a.lsp_item.selectionRange and a.lsp_item.selectionRange.start.line or 0
+            local lb = b.lsp_item and b.lsp_item.selectionRange and b.lsp_item.selectionRange.start.line or 0
+            return la < lb
+        end)
+    end
+    return sorted
+end
+
+--- Re-sorts all already-fetched children in the tree using the current sort_order.
+function Hierarchy:_resort_tree()
+    local function walk(nodes)
+        for _, node in ipairs(nodes) do
+            local children = self.tree:get_nodes(node:get_id())
+            if node.fetched and #children > 0 then
+                local sorted = self:_sort_nodes(children)
+                self.tree:set_nodes(sorted, node:get_id())
+                walk(sorted)
+            end
+        end
+    end
+    walk(self.tree:get_nodes())
+    self.tree:render()
+    update_position_display(self)
+    update_sort_display(self)
+end
+
 --- Prompts for a filter string and highlights / hides non-matching nodes.
 function Hierarchy:_enter_filter_mode()
     vim.ui.input({ prompt = "Filter: ", default = self.filter_text or "" }, function(input)
@@ -444,7 +557,8 @@ end
 --- Fetches children for a node and updates the tree.
 ---@param node table The NuiTree node to update.
 ---@param depth number The depth to recursively expand.
-function Hierarchy:update_node(node, depth)
+---@param restore_node_id? string When set, restore cursor to this node id after the first render.
+function Hierarchy:update_node(node, depth, restore_node_id)
     depth = depth or 1
     if not node or node.loading or (node.lsp_item and node.lsp_item.is_placeholder) then
         return
@@ -491,11 +605,25 @@ function Hierarchy:update_node(node, depth)
                     has_more = true,
                 }))
             end
+            child_nodes = self:_sort_nodes(child_nodes)
         end
         self.tree:set_nodes(child_nodes, node_id)
         if not parent:is_expanded() then parent:expand() end
         self.tree:render()
         update_position_display(self)
+
+        -- Restore sticky cursor if requested (used by breadcrumb back)
+        if restore_node_id and self:is_valid() then
+            vim.schedule(function()
+                if not self:is_valid() then return end
+                local target_row = find_node_row(self, restore_node_id)
+                if target_row then
+                    vim.api.nvim_win_set_cursor(self.tree_popup.winid, { target_row, 0 })
+                    update_position_display(self)
+                end
+            end)
+            restore_node_id = nil -- only restore once
+        end
 
         if depth > 1 and parent.has_more then
             for _, child_node in ipairs(self.tree:get_nodes(parent:get_id())) do

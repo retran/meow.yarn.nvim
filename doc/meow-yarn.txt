@@ -23,12 +23,14 @@ CONTENTS					*meow-yarn-contents*
 6. Custom Node Renderer			|meow-yarn-render-node|
 7. Breadcrumbs				|meow-yarn-breadcrumbs|
 8. Search / Filter			|meow-yarn-filter|
-9. Mappings				|meow-yarn-mappings|
-   - In-Window Mappings		|meow-yarn-in-window-mappings|
-10. Commands				|meow-yarn-commands|
-11. Contributing			|meow-yarn-contributing|
-12. License				|meow-yarn-license|
-13. Acknowledgments			|meow-yarn-acknowledgments|
+9. Sort Order				|meow-yarn-sort|
+10. Scroll Preview			|meow-yarn-scroll-preview|
+11. Mappings				|meow-yarn-mappings|
+    - In-Window Mappings		|meow-yarn-in-window-mappings|
+12. Commands				|meow-yarn-commands|
+13. Contributing			|meow-yarn-contributing|
+14. License				|meow-yarn-license|
+15. Acknowledgments			|meow-yarn-acknowledgments|
 
 ==============================================================================
 INTRODUCTION					*meow-yarn-introduction*
@@ -68,6 +70,13 @@ KEY FEATURES					*meow-yarn-features*
   fetched node at once.
 - *Horizontal Layout*: Set `window.layout = "horizontal"` to place the
   preview pane to the right of the tree instead of below it.
+- *Scroll Preview*: Press `<C-d>` / `<C-u>` to scroll the preview pane
+  without leaving the tree window.
+- *Sort Order*: Press `s` to cycle node sort order — LSP order, alphabetical,
+  or by file/line. The active sort is shown in the bottom-right border corner.
+- *Sticky Cursor on Back-Navigation*: Pressing `<BS>` to go back
+  automatically places the cursor on the node you drilled into, so you never
+  lose your place.
 - *Custom Node Renderer*: Supply a `render_node` function in your config to
   fully control how each tree node is displayed.
 - *Fast & Non-Blocking*: Fully asynchronous so it won't freeze your Neovim.
@@ -187,9 +196,15 @@ function. Here are the defaults:
 	        -- Set to nil to disable.
 	        expand_all = "zO",
 	        collapse_all = "zC",
-	        -- Open filter prompt. Set to nil to disable.
-	        filter = "/",
-	    },
+        -- Open filter prompt. Set to nil to disable.
+        filter = "/",
+        -- Scroll the preview pane without leaving the tree window.
+        -- Set to nil to disable.
+        preview_scroll_down = "<C-d>",
+        preview_scroll_up = "<C-u>",
+        -- Cycle node sort order (lsp → alpha → file). Set to nil to disable.
+        sort = "s",
+    },
 	    -- When true, the hierarchy window stays open after pressing <CR>
 	    -- to jump to a symbol. Default: false (window closes on jump).
 	    keep_open_on_jump = false,
@@ -248,7 +263,9 @@ a breadcrumb trail in the tree window title:
 	 [Animal] > [Dog] > [Poodle] 
 
 Pressing `<BS>` (the default `mappings.breadcrumb_back` key) navigates back
-one step, restoring the previous root item and direction.
+one step, restoring the previous root item and direction. The cursor is
+automatically placed on the node you drilled into, so you can continue
+exploring from where you left off.
 
 *Note*: Breadcrumb display uses nui.nvim's border text API and works on all
 supported Neovim versions (>= 0.8.0). No version upgrade is required.
@@ -280,6 +297,50 @@ To disable the filter keymap, set it to `nil`:
 >
 	require("meow.yarn").setup({
 	    mappings = { filter = nil },
+	})
+<
+
+==============================================================================
+SORT ORDER				*meow-yarn-sort*
+
+Press `s` (default `mappings.sort`) inside the hierarchy window to cycle
+through the available node sort orders:
+
+- *lsp*    — the order returned by the language server (default)
+- *alpha*  — alphabetical by symbol name (A → Z)
+- *file*   — by file path and line number
+
+The active sort order is shown in the bottom-right border corner:
+` lsp `, ` alpha `, or ` file `.
+
+Sort applies to every level of the visible tree and is preserved when you
+navigate to a new root or press `<BS>` to go back.
+
+To disable the sort keymap entirely:
+>
+	require("meow.yarn").setup({
+	    mappings = { sort = nil },
+	})
+<
+
+==============================================================================
+SCROLL PREVIEW				*meow-yarn-scroll-preview*
+
+Press `<C-d>` / `<C-u>` (defaults `mappings.preview_scroll_down` /
+`mappings.preview_scroll_up`) to scroll the preview pane half a page down or
+up without moving focus away from the tree window.
+
+This lets you read long functions while still navigating the hierarchy tree
+with all the normal keymaps.
+
+To disable or remap these keys:
+>
+	require("meow.yarn").setup({
+	    mappings = {
+	        preview_scroll_down = "<C-f>",
+	        preview_scroll_up   = "<C-b>",
+	        -- or set to nil to disable
+	    },
 	})
 <
 
@@ -367,7 +428,10 @@ Inside the hierarchy view, the following default keymappings are available:
 |`zO`|		Expand all fetched nodes (`mappings.expand_all`).
 |`zC`|		Collapse all nodes (`mappings.collapse_all`).
 |`/`|		Open filter prompt (`mappings.filter`).
+|`s`|		Cycle sort order: lsp → alpha → file (`mappings.sort`).
 |`y`|		Yank `file:line` of the selected node to clipboard (`mappings.yank_path`).
+|`<C-d>`|	Scroll preview pane down (`mappings.preview_scroll_down`).
+|`<C-u>`|	Scroll preview pane up (`mappings.preview_scroll_up`).
 |`K` / `J`|	Open new hierarchy from selected item (K=super/callers, J=sub/callees).
 |`<BS>`|	Navigate back one step in the breadcrumb history (`mappings.breadcrumb_back`).
 |`q`|		Quit the hierarchy view (`mappings.quit`).
