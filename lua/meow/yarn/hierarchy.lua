@@ -36,6 +36,39 @@ local animation = require("meow.yarn.animation")
 local Hierarchy = {}
 Hierarchy.__index = Hierarchy
 
+--- Builds the breadcrumb string from the history list.
+---@param history table List of { item, direction_key } entries.
+---@return string The breadcrumb text, e.g. " [A] > [B] > [C] ".
+local function build_breadcrumb_text(history)
+    if #history <= 1 then return "" end
+    local parts = {}
+    for _, entry in ipairs(history) do
+        table.insert(parts, "[" .. (entry.item.name or "?") .. "]")
+    end
+    return " " .. table.concat(parts, " > ") .. " "
+end
+
+--- Returns true if the running Neovim supports float window titles (>= 0.9.0).
+local function supports_float_title()
+    return vim.fn.has("nvim-0.9.0") == 1
+end
+
+--- Updates the tree popup border top text with the current breadcrumb trail.
+--- Requires Neovim >= 0.9.0 (float window title support). Silently skipped on
+--- older versions — breadcrumb history is still tracked; only the visual
+--- display is unavailable.
+---@param self table The Hierarchy instance.
+local function update_breadcrumb_display(self)
+    if not supports_float_title() then return end
+    if not self:is_valid() then return end
+    local text = build_breadcrumb_text(self.history)
+    if text == "" then
+        pcall(vim.api.nvim_win_set_config, self.tree_popup.winid, { title = "", title_pos = "left" })
+        return
+    end
+    pcall(vim.api.nvim_win_set_config, self.tree_popup.winid, { title = text, title_pos = "left" })
+end
+
 --- Creates a new Hierarchy instance.
 ---@param client table The LSP client.
 ---@param root_item table The root item of the hierarchy.
@@ -49,6 +82,8 @@ function Hierarchy:new(client, root_item, strategy, direction_key)
     instance.strategy = strategy
     instance.direction_key = direction_key
     instance.active_requests = {}
+    -- Navigation history: list of { item = <lsp_item>, direction_key = <string> }
+    instance.history = { { item = root_item, direction_key = direction_key } }
 
     local help_text = instance.strategy.generate_help_text(cfg.mappings)
 
@@ -138,15 +173,20 @@ function Hierarchy:unmount()
     animation.manage_animation_timer()
 end
 
---- Resets the hierarchy to a new root item and direction.
+--- Resets the hierarchy to a new root item and direction, recording history.
 ---@param root_item table The new root LSP item.
 ---@param direction_key string The new direction key.
-function Hierarchy:reset(root_item, direction_key)
+---@param skip_history? boolean When true, do not append to history (used for back navigation).
+function Hierarchy:reset(root_item, direction_key, skip_history)
     for _, request_id in pairs(self.active_requests) do
         self.client.cancel_request(request_id)
     end
     self.active_requests = {}
     self.direction_key = direction_key
+
+    if not skip_history then
+        table.insert(self.history, { item = root_item, direction_key = direction_key })
+    end
 
     local Node = require("nui.tree").Node
     local get_item_key = self.strategy.get_item_key or util.default_key_from_item
@@ -164,12 +204,30 @@ function Hierarchy:reset(root_item, direction_key)
     if self:is_valid() then
         vim.api.nvim_win_set_cursor(self.tree_popup.winid, { 1, 0 })
     end
+
+    update_breadcrumb_display(self)
+
     vim.schedule(function()
         if self:is_valid() then
             local cfg = get_config()
             self:update_node(new_root_node, cfg.expand_depth)
         end
     end)
+end
+
+--- Navigates back one step in the breadcrumb history.
+function Hierarchy:breadcrumb_back()
+    if #self.history <= 1 then return end
+    -- Remove current entry
+    table.remove(self.history, #self.history)
+    local prev = self.history[#self.history]
+    -- Remove that entry too so reset() won't double-add it
+    table.remove(self.history, #self.history)
+    -- Reset to previous state; skip_history=true because we re-insert below
+    self:reset(prev.item, prev.direction_key, true)
+    -- Re-insert the restored entry (reset removed it from pending state)
+    table.insert(self.history, { item = prev.item, direction_key = prev.direction_key })
+    update_breadcrumb_display(self)
 end
 
 --- Creates the Nui layout for the hierarchy and preview windows.
@@ -221,6 +279,11 @@ function Hierarchy:_setup_keymaps()
     map(cfg.mappings.expand_alt, expand_action(true), "Expand (alt)")
     map(cfg.mappings.collapse, function() local n = self.tree:get_node() if n then n:collapse() self.tree:render() end end, "Collapse")
     map(cfg.mappings.collapse_alt, function() local n = self.tree:get_node() if n then n:collapse() self.tree:render() end end, "Collapse (alt)")
+
+    -- Breadcrumb back navigation
+    if cfg.mappings.breadcrumb_back then
+        map(cfg.mappings.breadcrumb_back, function() self:breadcrumb_back() end, "Navigate back in breadcrumbs")
+    end
 
     local function switch_direction(new_direction_key)
         local node = self.tree:get_node()
@@ -353,14 +416,14 @@ function Hierarchy:_setup_preview()
             local last_line = math.min(vim.api.nvim_buf_line_count(source_bufnr), start_line_0 + ctx + 1)
             local lines = vim.api.nvim_buf_get_lines(source_bufnr, first_line, last_line, false)
 
-            vim.api.nvim_buf_set_option(pbuf, "readonly", false)
-            vim.api.nvim_buf_set_option(pbuf, "modifiable", true)
+            vim.bo[pbuf].readonly = false
+            vim.bo[pbuf].modifiable = true
             vim.api.nvim_buf_clear_namespace(pbuf, preview_ns, 0, -1)
             vim.api.nvim_buf_set_lines(pbuf, 0, -1, false, lines)
             local highlight_line = start_line_0 - first_line
             vim.api.nvim_buf_add_highlight(pbuf, preview_ns, K.HIGHLIGHT_GROUP, highlight_line, 0, -1)
-            vim.api.nvim_buf_set_option(pbuf, "modifiable", false)
-            vim.api.nvim_buf_set_option(pbuf, "readonly", true)
+            vim.bo[pbuf].modifiable = false
+            vim.bo[pbuf].readonly = true
             vim.api.nvim_win_set_cursor(self.preview_popup.winid, { highlight_line + 1, 0 })
             vim.api.nvim_win_call(self.preview_popup.winid, function() vim.cmd("normal! zt") end)
         end)

@@ -40,7 +40,7 @@
 ---@class meow.yarn.Config
 ---@field window? { width?: number, height?: number, border?: string, preview_height_ratio?: number }
 ---@field icons? { loading?: string, placeholder?: string, animation_frames?: string[] }
----@field mappings? { jump?: string, toggle?: string, expand?: string, expand_alt?: string, collapse?: string, collapse_alt?: string, show_super_hierarchy?: string, show_sub_hierarchy?: string, quit?: string }
+---@field mappings? { jump?: string, toggle?: string, expand?: string, expand_alt?: string, collapse?: string, collapse_alt?: string, show_super_hierarchy?: string, show_sub_hierarchy?: string, quit?: string, breadcrumb_back?: string }
 ---@field expand_depth? number
 ---@field preview_context_lines? number
 ---@field animation_speed? number
