@@ -82,29 +82,26 @@ local default_config = {
     },
 }
 
----@param path string The path to the field being validated
----@param tbl table The table to validate
----@see vim.validate
----@return boolean is_valid
----@return string|nil error_message
-local function validate_path(path, tbl)
-  local ok, err = pcall(vim.validate, tbl)
-  return ok, err and path .. "." .. err
-end
-
 ---@param cfg meow.yarn.InternalConfig
 ---@return boolean is_valid
 ---@return string|nil error_message
 function M.validate(cfg)
-    return validate_path("vim.g.meow_yarn", {
-        window = { cfg.window, "table" },
-        icons = { cfg.icons, "table" },
-        mappings = { cfg.mappings, "table" },
-        expand_depth = { cfg.expand_depth, "number" },
-        preview_context_lines = { cfg.preview_context_lines, "number" },
-        animation_speed = { cfg.animation_speed, "number" },
-        hierarchies = { cfg.hierarchies, "table" },
-    })
+    local fields = {
+        { "vim.g.meow_yarn.window",                cfg.window,                "table" },
+        { "vim.g.meow_yarn.icons",                 cfg.icons,                 "table" },
+        { "vim.g.meow_yarn.mappings",              cfg.mappings,              "table" },
+        { "vim.g.meow_yarn.expand_depth",          cfg.expand_depth,          "number" },
+        { "vim.g.meow_yarn.preview_context_lines", cfg.preview_context_lines, "number" },
+        { "vim.g.meow_yarn.animation_speed",       cfg.animation_speed,       "number" },
+        { "vim.g.meow_yarn.hierarchies",           cfg.hierarchies,           "table" },
+    }
+    for _, spec in ipairs(fields) do
+        local ok, err = pcall(vim.validate, spec[1], spec[2], spec[3])
+        if not ok then
+            return false, err
+        end
+    end
+    return true, nil
 end
 
 function M.get()
