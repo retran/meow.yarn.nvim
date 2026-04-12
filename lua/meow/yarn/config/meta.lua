@@ -25,6 +25,18 @@
 -- @author: Andrew Vasilyev
 -- @license: MIT
 
+---@class meow.yarn.NodeInfo
+---@field name string The symbol name.
+---@field kind string The symbol kind as a string (e.g. "Class", "Function").
+---@field icon string The resolved icon string for this node.
+---@field file string|nil The shortened file path, or nil if not available.
+---@field line number|nil The 1-based line number of the symbol, or nil if not available.
+---@field detail string|nil The symbol detail string from the LSP, or nil.
+---@field depth number The depth of the node in the tree (root = 1).
+---@field is_loading boolean Whether the node is currently loading children.
+---@field is_placeholder boolean Whether the node is a placeholder (loading indicator).
+---@field direction string|nil The hierarchy direction key (e.g. "supertypes", "callers").
+
 ---@class meow.yarn.Config
 ---@field window? { width?: number, height?: number, border?: string, preview_height_ratio?: number }
 ---@field icons? { loading?: string, placeholder?: string, animation_frames?: string[] }
@@ -33,6 +45,7 @@
 ---@field preview_context_lines? number
 ---@field animation_speed? number
 ---@field hierarchies? { type_hierarchy?: { icons?: { class?: string, struct?: string, interface?: string, default?: string } }, call_hierarchy?: { icons?: { method?: string, func?: string, variable?: string, default?: string } } }
+---@field render_node? fun(node_info: meow.yarn.NodeInfo): string|nil Custom renderer called for each tree node. Return a string to override the default rendering, or nil to use the default.
 
 ---@type meow.yarn.Config | fun():meow.yarn.Config | nil
 vim.g.meow_yarn = vim.g.meow_yarn

@@ -1,4 +1,4 @@
-*meow-yarn.txt*	For Neovim >= 0.8.0	Last change: 2025 September 16
+*meow-yarn.txt*	For Neovim >= 0.8.0	Last change: 2026 April 12
 
 MEOW.YARN.NVIM				*meow.yarn* *meow-yarn*
 
@@ -20,12 +20,14 @@ CONTENTS					*meow-yarn-contents*
    - Installation			|meow-yarn-installation|
    - Quick Start			|meow-yarn-quick-start|
 5. Configuration			|meow-yarn-configuration|
-6. Mappings				|meow-yarn-mappings|
+6. Custom Node Renderer			|meow-yarn-render-node|
+7. Breadcrumbs				|meow-yarn-breadcrumbs|
+8. Mappings				|meow-yarn-mappings|
    - In-Window Mappings		|meow-yarn-in-window-mappings|
-7. Commands				|meow-yarn-commands|
-8. Contributing				|meow-yarn-contributing|
-9. License				|meow-yarn-license|
-10. Acknowledgments			|meow-yarn-acknowledgments|
+9. Commands				|meow-yarn-commands|
+10. Contributing			|meow-yarn-contributing|
+11. License				|meow-yarn-license|
+12. Acknowledgments			|meow-yarn-acknowledgments|
 
 ==============================================================================
 INTRODUCTION					*meow-yarn-introduction*
@@ -49,6 +51,10 @@ KEY FEATURES					*meow-yarn-features*
 - *Explore Deeper*: Pick any symbol in the tree and make it the new starting
   point for exploration, or switch directions (e.g., from callers to
   callees) on the fly.
+- *Navigation Breadcrumbs*: A history bar at the top of the window tracks
+  your exploration path. Click any breadcrumb to jump back to that state.
+- *Custom Node Renderer*: Supply a `render_node` function in your config to
+  fully control how each tree node is displayed.
 - *Fast & Non-Blocking*: Fully asynchronous so it won't freeze your Neovim.
 - *Built on Solid Foundations*: Powered by Neovim's native LSP and
   `nui.nvim`.
@@ -158,19 +164,91 @@ function. Here are the defaults:
 	                class = "󰌗",
 	                struct = "󰙅",
 	                interface = "󰌆",
-	                default = "",
+	                default = "",
 	            },
 	        },
 	        call_hierarchy = {
 	            icons = {
 	                method = "󰆧",
 	                func = "󰊕",
-	                variable = "",
-	                default = "",
+	                variable = "",
+	                default = "",
 	            },
 	        },
 	    },
+
+	    -- Optional: override how each tree node is rendered.
+	    -- When set, this function is called for every node instead of the
+	    -- built-in renderer. Return a plain string to use as the full line
+	    -- text, or return nil to fall back to the default rendering.
+	    --
+	    -- The argument is a meow.yarn.NodeInfo table with these fields:
+	    --   name         string       Symbol name
+	    --   kind         string       Kind string (e.g. "Class", "Function")
+	    --   icon         string       Resolved icon for this node
+	    --   file         string|nil   Shortened file path, or nil
+	    --   line         number|nil   1-based line number, or nil
+	    --   detail       string|nil   LSP detail string, or nil
+	    --   depth        number       Tree depth (root = 1)
+	    --   is_loading   boolean      True while children are being fetched
+	    --   is_placeholder boolean    True for the initial loading placeholder
+	    --   direction    string|nil   Direction key (e.g. "supertypes", "callers")
+	    --
+	    -- render_node = function(node_info)
+	    --     return string.format("%s %s", node_info.icon, node_info.name)
+	    -- end,
 	})
+<
+
+==============================================================================
+CUSTOM NODE RENDERER			*meow-yarn-render-node*
+
+The `render_node` configuration option lets you fully control how each node
+in the hierarchy tree is displayed.
+
+When set, the function receives a |meow-yarn-nodeinfo| table for every node
+and must return either a plain string (the full line text) or `nil` to fall
+back to the built-in rendering.
+
+Example — show only icon and name: >
+	require("meow.yarn").setup({
+	    render_node = function(node)
+	        return string.format("%s %s", node.icon, node.name)
+	    end,
+	})
+<
+
+Example — compact format with file and line: >
+	require("meow.yarn").setup({
+	    render_node = function(node)
+	        local loc = ""
+	        if node.file then
+	            loc = string.format("  %s", node.file)
+	            if node.line then loc = loc .. ":" .. node.line end
+	        end
+	        return string.format("%s %s%s", node.icon, node.name, loc)
+	    end,
+	})
+<
+
+Note: the custom renderer replaces the *entire* line content — indentation,
+expand arrows, and highlight groups are all your responsibility. The function
+is called even for loading and placeholder nodes; check `node.is_loading`
+and `node.is_placeholder` as needed.
+
+							*meow-yarn-nodeinfo*
+The `node_info` table passed to `render_node` has these fields:
+
+	`name`           string       Symbol name.
+	`kind`           string       Symbol kind (e.g. "Class", "Function").
+	`icon`           string       Resolved icon string for this node.
+	`file`           string|nil   Shortened file path, or nil.
+	`line`           number|nil   1-based line number, or nil.
+	`detail`         string|nil   LSP detail string, or nil.
+	`depth`          number       Tree depth (root = 1).
+	`is_loading`     boolean      True while children are being fetched.
+	`is_placeholder` boolean      True for the initial loading placeholder.
+	`direction`      string|nil   Hierarchy direction key.
 <
 
 ==============================================================================
