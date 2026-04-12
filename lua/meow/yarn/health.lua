@@ -119,7 +119,8 @@ end
 local function check_lsp_clients()
     vim.health.start("LSP Clients")
 
-    local active_clients = vim.lsp.get_active_clients()
+    local get_clients = vim.lsp.get_clients or vim.lsp.get_active_clients
+    local active_clients = get_clients()
     if #active_clients == 0 then
         vim.health.warn("No active LSP clients found. Type and call hierarchies require LSP servers.")
         return false

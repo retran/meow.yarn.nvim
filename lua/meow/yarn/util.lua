@@ -39,6 +39,11 @@ M.K = {
 ---@class meow.yarn.LspUtils
 M.lsp = {}
 
+-- Tracks recently shown LSP error messages to avoid spamming the user.
+-- Maps "method:message" -> timestamp of last notification.
+local _lsp_error_cache = {}
+local _LSP_ERROR_DEBOUNCE_MS = 3000
+
 --- Sends an async request to an LSP client.
 ---@param client table The LSP client.
 ---@param method string The LSP method to call.
@@ -47,10 +52,23 @@ M.lsp = {}
 ---@param callback function The callback to execute with the result.
 function M.lsp.request_async(client, method, params, bufnr, callback)
     client.request(method, params or {}, function(err, res)
-        if err and err.code ~= -32800 then -- -32800: "Request cancelled"
-            vim.schedule(function()
-                vim.notify(string.format("LSP %s: %s", method, err.message or "error"), vim.log.levels.ERROR)
-            end)
+        if err then
+            if err.code == -32800 then -- Request cancelled — silent
+                return callback(nil)
+            end
+            -- Deduplicate noisy LSP error notifications (e.g. server-side
+            -- "key not found" errors from servers that don't track all documents).
+            local key = method .. ":" .. (err.message or "")
+            local now = vim.uv and vim.uv.now() or vim.loop.now()
+            if not _lsp_error_cache[key] or (now - _lsp_error_cache[key]) >= _LSP_ERROR_DEBOUNCE_MS then
+                _lsp_error_cache[key] = now
+                vim.schedule(function()
+                    vim.notify(
+                        string.format("LSP %s: %s", method, err.message or "error"),
+                        vim.log.levels.WARN
+                    )
+                end)
+            end
             return callback(nil)
         end
         callback(res or {})
@@ -62,13 +80,14 @@ end
 ---@param capability_key string The server capability to check for (e.g., "typeHierarchyProvider").
 ---@return table|nil The found LSP client, or nil.
 function M.lsp.find_client(bufnr, capability_key)
-    for _, client in ipairs(vim.lsp.get_active_clients({ bufnr = bufnr })) do
+    local get_clients = vim.lsp.get_clients or vim.lsp.get_active_clients
+    for _, client in ipairs(get_clients({ bufnr = bufnr })) do
         if client.server_capabilities and client.server_capabilities[capability_key] then
             return client
         end
     end
     -- Fallback to checking all clients if no buffer-specific client is found
-    for _, client in ipairs(vim.lsp.get_active_clients()) do
+    for _, client in ipairs(get_clients()) do
         if client.server_capabilities and client.server_capabilities[capability_key] then
             return client
         end
