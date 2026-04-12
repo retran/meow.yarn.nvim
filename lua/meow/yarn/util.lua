@@ -113,15 +113,22 @@ end
 ---@param lsp_item table The LSP item with URI and range.
 ---@param client table The LSP client, used for offset encoding.
 function M.jump_to_item(lsp_item, client)
-    if not lsp_item or not lsp_item.uri then
+    local item = lsp_item.item
+    if (not lsp_item or not lsp_item.uri) and (not item or not item.uri) then
         return
     end
     local range = lsp_item.selectionRange or lsp_item.range
-    if not range then
+    local uri = lsp_item.uri
+    if item then
+        range = lsp_item.fromRanges[1]
+        uri = item.uri
+    end
+
+    if not range or not uri then
         return
     end
     local encoding = M.lsp.get_encoding(client)
-    vim.lsp.util.show_document({ uri = lsp_item.uri, range = range }, encoding, { focus = true })
+    vim.lsp.util.show_document({ uri = uri, range = range }, encoding, { focus = true })
 end
 
 --- Creates a default key for an LSP item to be used as a node ID.
