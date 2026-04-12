@@ -156,8 +156,8 @@ function. Here are the defaults:
 	        collapse = "h",
 	        collapse_alt = "<Left>",
 	        quit = "q",
-	        -- Navigate back through breadcrumb history (requires Neovim >= 0.9.0
-	        -- for the visual title; set to false or "" to disable the keymap):
+	        -- Navigate back through breadcrumb history.
+	        -- Set to nil to disable the keymap entirely.
 	        breadcrumb_back = "<BS>",
 	    },
 	    expand_depth = 3,
@@ -217,16 +217,14 @@ a breadcrumb trail in the tree window title:
 Pressing `<BS>` (the default `mappings.breadcrumb_back` key) navigates back
 one step, restoring the previous root item and direction.
 
-*Note*: The visual title requires Neovim >= 0.9.0 (float window title
-support). On Neovim 0.8.x the history is still tracked internally and `<BS>`
-navigation still works — the title just will not be shown. Run
-`:checkhealth meow.yarn` to see whether your version supports it.
+*Note*: Breadcrumb display uses nui.nvim's border text API and works on all
+supported Neovim versions (>= 0.8.0). No version upgrade is required.
 
 To disable breadcrumb-back navigation entirely (e.g. to reclaim `<BS>` for
-another use), set the mapping to an empty string or `false` in your config:
+another use), set the mapping to `nil` in your config:
 >
 	require("meow.yarn").setup({
-	    mappings = { breadcrumb_back = "" },
+	    mappings = { breadcrumb_back = nil },
 	})
 <
 

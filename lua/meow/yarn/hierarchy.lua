@@ -280,8 +280,8 @@ function Hierarchy:_setup_keymaps()
     map(cfg.mappings.collapse, function() local n = self.tree:get_node() if n then n:collapse() self.tree:render() end end, "Collapse")
     map(cfg.mappings.collapse_alt, function() local n = self.tree:get_node() if n then n:collapse() self.tree:render() end end, "Collapse (alt)")
 
-    -- Breadcrumb back navigation
-    if cfg.mappings.breadcrumb_back then
+    -- Set nil to disable the breadcrumb-back keymap entirely.
+    if type(cfg.mappings.breadcrumb_back) == "string" and cfg.mappings.breadcrumb_back ~= "" then
         map(cfg.mappings.breadcrumb_back, function() self:breadcrumb_back() end, "Navigate back in breadcrumbs")
     end
 

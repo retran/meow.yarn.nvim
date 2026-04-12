@@ -43,7 +43,7 @@ local default_config = {
         placeholder = "",
         animation_frames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
     },
-    ---@type { jump: string, toggle: string, expand: string, expand_alt: string, collapse: string, collapse_alt: string, quit: string, breadcrumb_back: string }
+    ---@type { jump: string, toggle: string, expand: string, expand_alt: string, collapse: string, collapse_alt: string, show_super_hierarchy: string, show_sub_hierarchy: string, quit: string, breadcrumb_back: string|nil }
     mappings = {
         jump = "<CR>",
         toggle = "<Tab>",
