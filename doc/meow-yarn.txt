@@ -53,8 +53,7 @@ KEY FEATURES					*meow-yarn-features*
   callees) on the fly.
 - *Navigation Breadcrumbs*: A history trail at the top of the tree window
   tracks where you navigated. Press `<BS>` to step back through your
-  exploration path. Requires Neovim >= 0.9.0 for the visual title; history
-  is always tracked regardless of version.
+  exploration path.
 - *Custom Node Renderer*: Supply a `render_node` function in your config to
   fully control how each tree node is displayed.
 - *Fast & Non-Blocking*: Fully asynchronous so it won't freeze your Neovim.
@@ -65,7 +64,7 @@ KEY FEATURES					*meow-yarn-features*
 PREREQUISITES				*meow-yarn-prerequisites*
 
 Required:
-- Neovim: >= 0.8.0 (>= 0.9.0 for breadcrumb title display; 0.10+ recommended)
+- Neovim: >= 0.8.0 (0.10+ recommended)
 - LSP Client: An active LSP server that supports `typeHierarchyProvider` or
   `callHierarchyProvider`.
 - Dependencies: `nui.nvim`
