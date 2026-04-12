@@ -2,7 +2,7 @@
 
 All notable changes to meow.yarn.nvim are documented here.
 
-## [Unreleased] - v0.1.4
+## [0.1.4] - 2026-04-12
 
 ### Added
 
@@ -22,7 +22,7 @@ All notable changes to meow.yarn.nvim are documented here.
 - Breadcrumb display incorrectly updated during back navigation — moved `update_breadcrumb_display` inside the `skip_history` guard in `reset()`
 - `breadcrumb_back()` double-remove bug — previous entry was being removed from history twice and then re-inserted; now only the current entry is popped and `reset(skip_history=true)` is called with the previous entry already in place
 
-## [0.1.2] - 2025-12-01
+## [0.1.2] - 2026-04-12
 
 ### Added
 
