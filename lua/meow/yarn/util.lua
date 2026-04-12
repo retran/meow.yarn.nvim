@@ -158,4 +158,59 @@ function M.short_path(p)
     return p and vim.fn.fnamemodify(p, ":~:.") or ""
 end
 
+--- LSP kind number to human-readable name mapping.
+M.LSP_KIND_NAMES = {
+    [1] = "File", [2] = "Module", [3] = "Namespace", [4] = "Package",
+    [5] = "Class", [6] = "Method", [7] = "Property", [8] = "Field",
+    [9] = "Constructor", [10] = "Enum", [11] = "Interface", [12] = "Function",
+    [13] = "Variable", [14] = "Constant", [15] = "String", [16] = "Number",
+    [17] = "Boolean", [18] = "Array", [19] = "Object", [20] = "Key",
+    [21] = "Null", [22] = "EnumMember", [23] = "Struct", [24] = "Event",
+    [25] = "Operator", [26] = "TypeParameter",
+}
+
+--- Tries to invoke a user-supplied render_node function for a node.
+--- If the function returns a non-nil string, wraps it in a NuiLine and returns it.
+--- Returns nil if no custom renderer is configured or if it returns nil.
+---@param node table The NuiTree node.
+---@param item table The resolved LSP item for this node.
+---@param icon string The resolved icon string.
+---@param hierarchy_instance table The Hierarchy instance.
+---@return table|nil A NuiLine if the custom renderer produced output, else nil.
+function M.try_custom_render(node, item, icon, hierarchy_instance)
+    local cfg = require("meow.yarn.config.internal").get()
+    if type(cfg.render_node) ~= "function" then return nil end
+
+    local file = item.uri and vim.uri_to_fname(item.uri) or nil
+    local sel = (item.selectionRange and item.selectionRange.start) or (item.range and item.range.start)
+
+    ---@type meow.yarn.NodeInfo
+    local node_info = {
+        name = item.name or "",
+        kind = M.LSP_KIND_NAMES[item.kind] or "Unknown",
+        icon = icon,
+        file = file and M.short_path(file) or nil,
+        line = sel and (sel.line + 1) or nil,
+        detail = (item.detail and item.detail ~= "") and item.detail or nil,
+        depth = node:get_depth(),
+        is_loading = node.loading or false,
+        is_placeholder = item.is_placeholder or false,
+        direction = node.dir_key,
+    }
+
+    local ok, result = pcall(cfg.render_node, node_info)
+    if not ok then
+        vim.schedule(function()
+            vim.notify("MeowYarn render_node error: " .. tostring(result), vim.log.levels.ERROR)
+        end)
+        return nil
+    end
+    if type(result) ~= "string" then return nil end
+
+    local Line = require("nui.line")
+    local line = Line()
+    line:append(result)
+    return line
+end
+
 return M

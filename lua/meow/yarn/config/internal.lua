@@ -101,6 +101,12 @@ function M.validate(cfg)
             return false, err
         end
     end
+    if cfg.render_node ~= nil then
+        local ok, err = pcall(vim.validate, "vim.g.meow_yarn.render_node", cfg.render_node, "function")
+        if not ok then
+            return false, err
+        end
+    end
     return true, nil
 end
 

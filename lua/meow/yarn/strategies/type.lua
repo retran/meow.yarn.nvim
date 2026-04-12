@@ -108,7 +108,7 @@ function type_hierarchy_strategy.render_node_line(node, hierarchy_instance)
         local frame = cfg.icons.animation_frames[state.G.animation_frame_index] or cfg.icons.loading
         line:append(frame .. " ", "SpecialChar")
     elseif node:has_children() or node.has_more then
-        line:append(node:is_expanded() and " " or " ", "SpecialChar")
+        line:append(node:is_expanded() and " " or " ", "SpecialChar")
     else
         line:append("  ")
     end
@@ -117,6 +117,11 @@ function type_hierarchy_strategy.render_node_line(node, hierarchy_instance)
     local icons = cfg.hierarchies.type_hierarchy.icons
     local icon_map = { [SYMBOL_KIND.Class] = icons.class, [SYMBOL_KIND.Struct] = icons.struct, [SYMBOL_KIND.Interface] = icons.interface }
     local icon = item.is_placeholder and cfg.icons.placeholder or (icon_map[item.kind] or icons.default)
+
+    -- Try user-supplied custom renderer first
+    local custom_line = util.try_custom_render(node, item, icon, hierarchy_instance)
+    if custom_line then return custom_line end
+
     line:append(icon .. " ")
     line:append(item.name)
 

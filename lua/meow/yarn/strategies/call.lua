@@ -114,18 +114,24 @@ function call_hierarchy_strategy.render_node_line(node, hierarchy_instance)
         local frame = cfg.icons.animation_frames[state.G.animation_frame_index] or cfg.icons.loading
         line:append(frame .. " ", "SpecialChar")
     elseif node:has_children() or node.has_more then
-        line:append(node:is_expanded() and " " or " ", "SpecialChar")
+        line:append(node:is_expanded() and " " or " ", "SpecialChar")
     else
         line:append("  ")
     end
 
-local lsp_kind_to_name = {
-    [6] = "method",
-    [12] = "func",
-    [13] = "variable",
-}    local icons = cfg.hierarchies.call_hierarchy.icons
+    local lsp_kind_to_name = {
+        [6] = "method",
+        [12] = "func",
+        [13] = "variable",
+    }
+    local icons = cfg.hierarchies.call_hierarchy.icons
     local kind_name = lsp_kind_to_name[item.kind]
     local icon = item.is_placeholder and cfg.icons.placeholder or (kind_name and icons[kind_name] or icons.default)
+
+    -- Try user-supplied custom renderer first
+    local custom_line = util.try_custom_render(node, item, icon, hierarchy_instance)
+    if custom_line then return custom_line end
+
     line:append(icon .. " ")
     line:append(item.name)
 
