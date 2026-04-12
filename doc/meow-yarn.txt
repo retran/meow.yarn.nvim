@@ -259,7 +259,7 @@ Example — compact format with file and line: >
 	})
 <
 
-Note: the custom renderer replaces the *entire* line content — indentation,
+Note: the custom renderer replaces the entire line content — indentation,
 expand arrows, and highlight groups are all your responsibility. The function
 is called even for loading and placeholder nodes; check `node.is_loading`
 and `node.is_placeholder` as needed.
