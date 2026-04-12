@@ -150,6 +150,10 @@ function Hierarchy:mount()
     self:_setup_preview()
     self:_setup_cleanup()
     self.tree:render()
+    -- Defer until after layout:mount() has assigned tree_popup.winid
+    vim.schedule(function()
+        update_breadcrumb_display(self)
+    end)
 end
 
 --- Unmounts the hierarchy UI and cleans up resources.
@@ -186,6 +190,7 @@ function Hierarchy:reset(root_item, direction_key, skip_history)
 
     if not skip_history then
         table.insert(self.history, { item = root_item, direction_key = direction_key })
+        update_breadcrumb_display(self)
     end
 
     local Node = require("nui.tree").Node
@@ -205,8 +210,6 @@ function Hierarchy:reset(root_item, direction_key, skip_history)
         vim.api.nvim_win_set_cursor(self.tree_popup.winid, { 1, 0 })
     end
 
-    update_breadcrumb_display(self)
-
     vim.schedule(function()
         if self:is_valid() then
             local cfg = get_config()
@@ -218,15 +221,10 @@ end
 --- Navigates back one step in the breadcrumb history.
 function Hierarchy:breadcrumb_back()
     if #self.history <= 1 then return end
-    -- Remove current entry
     table.remove(self.history, #self.history)
     local prev = self.history[#self.history]
-    -- Remove that entry too so reset() won't double-add it
-    table.remove(self.history, #self.history)
-    -- Reset to previous state; skip_history=true because we re-insert below
+    -- skip_history=true so reset() does not append prev again; it is already in place.
     self:reset(prev.item, prev.direction_key, true)
-    -- Re-insert the restored entry (reset removed it from pending state)
-    table.insert(self.history, { item = prev.item, direction_key = prev.direction_key })
     update_breadcrumb_display(self)
 end
 
