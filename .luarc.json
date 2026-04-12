@@ -1,18 +1,10 @@
 {
-  "runtime.version": "Lua 5.1",
-  "runtime.path": [
-    "?.lua",
-    "?/init.lua"
-  ],
-  "diagnostics.globals": [
-    "vim"
-  ],
-  "workspace.library": [
-    "$VIMRUNTIME/lua",
-    "./lua"
-  ],
-  "workspace.checkThirdParty": false,
-  "completion.callSnippet": "Replace",
-  "completion.keywordSnippet": "Replace",
-  "telemetry.enable": false
+    "runtime.version": "Lua 5.1",
+    "runtime.path": ["?.lua", "?/init.lua"],
+    "diagnostics.globals": ["vim"],
+    "workspace.library": ["$VIMRUNTIME/lua", "./lua"],
+    "workspace.checkThirdParty": false,
+    "completion.callSnippet": "Replace",
+    "completion.keywordSnippet": "Replace",
+    "telemetry.enable": false
 }

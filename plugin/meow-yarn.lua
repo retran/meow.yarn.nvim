@@ -97,6 +97,12 @@ local subcommand_tbl = {
                 :totable()
         end,
     },
+    last = {
+        impl = function(_, _)
+            if not check_dependencies() then return end
+            require("meow.yarn").reopen_last()
+        end,
+    },
 }
 
 ---@param opts table :h lua-guide-commands-create
@@ -105,7 +111,7 @@ local function meow_yarn_cmd(opts)
     local subcommand_key = fargs[1]
 
     if not subcommand_key then
-        vim.notify("Usage: :MeowYarn <type|call> [super|sub|callers|callees]", vim.log.levels.ERROR)
+        vim.notify("Usage: :MeowYarn <type|call|last> [super|sub|callers|callees]", vim.log.levels.ERROR)
         return
     end
 
@@ -125,7 +131,7 @@ end
 -- Create the main command with proper completions
 vim.api.nvim_create_user_command("MeowYarn", meow_yarn_cmd, {
     nargs = "+",
-    desc = "Open hierarchy view (Usage: MeowYarn <type|call> [super|sub|callers|callees])",
+    desc = "Open hierarchy view (Usage: MeowYarn <type|call|last> [super|sub|callers|callees])",
     complete = function(arg_lead, cmdline, _)
         -- Get the subcommand
         local subcmd_key, subcmd_arg_lead = cmdline:match("^['<,'>]*MeowYarn[!]*%s(%S+)%s(.*)$")
@@ -171,6 +177,11 @@ vim.keymap.set("n", "<Plug>(MeowYarnCallCallees)", function()
     if not check_dependencies() then return end
     require("meow.yarn").open_tree("call_hierarchy", "callees")
 end, { desc = "Show call hierarchy callees" })
+
+vim.keymap.set("n", "<Plug>(MeowYarnLast)", function()
+    if not check_dependencies() then return end
+    require("meow.yarn").reopen_last()
+end, { desc = "Re-open last hierarchy session" })
 
 -- Initialize highlights and signs (this is minimal overhead)
 vim.api.nvim_set_hl(0, "MeowYarnPreview", { link = "Visual", default = true })

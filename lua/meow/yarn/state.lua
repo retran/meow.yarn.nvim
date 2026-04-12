@@ -33,10 +33,12 @@ local M = {}
 ---@field active_hierarchies table<number, any> A map of buffer numbers to active hierarchy instances.
 ---@field animation_timer any|nil The timer for the loading animation.
 ---@field animation_frame_index number The current frame index for the loading animation.
+---@field last_session { item: table, strategy_name: string, direction_key: string }|nil The last opened hierarchy session, for re-opening.
 M.G = {
     active_hierarchies = {},
     animation_timer = nil,
     animation_frame_index = 1,
+    last_session = nil,
 }
 
 return M

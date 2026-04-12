@@ -128,9 +128,17 @@ function call_hierarchy_strategy.render_node_line(node, hierarchy_instance)
     local kind_name = lsp_kind_to_name[item.kind]
     local icon = item.is_placeholder and cfg.icons.placeholder or (kind_name and icons[kind_name] or icons.default)
 
+    -- Dim filtered-out nodes; skip custom renderer so the highlight is applied uniformly.
+    if node._filtered_out then
+        line:append(icon .. " " .. item.name, "Comment")
+        return line
+    end
+
     -- Try user-supplied custom renderer first
     local custom_line = util.try_custom_render(node, item, icon, hierarchy_instance)
-    if custom_line then return custom_line end
+    if custom_line then
+        return custom_line
+    end
 
     line:append(icon .. " ")
     line:append(item.name)
