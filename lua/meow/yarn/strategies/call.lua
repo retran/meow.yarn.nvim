@@ -128,23 +128,16 @@ function call_hierarchy_strategy.render_node_line(node, hierarchy_instance)
     local kind_name = lsp_kind_to_name[item.kind]
     local icon = item.is_placeholder and cfg.icons.placeholder or (kind_name and icons[kind_name] or icons.default)
 
+    -- Dim filtered-out nodes; skip custom renderer so the highlight is applied uniformly.
+    if node._filtered_out then
+        line:append(icon .. " " .. item.name, "Comment")
+        return line
+    end
+
     -- Try user-supplied custom renderer first
     local custom_line = util.try_custom_render(node, item, icon, hierarchy_instance)
     if custom_line then
-        if node._filtered_out then
-            local Line2 = require("nui.line")
-            local Text2 = require("nui.text")
-            local dimmed = Line2()
-            dimmed:append(Text2(tostring(custom_line), "Comment"))
-            return dimmed
-        end
         return custom_line
-    end
-
-    if node._filtered_out then
-        local dim_line = Line()
-        dim_line:append(string.rep("  ", math.max(0, node:get_depth() - 1)) .. "  " .. icon .. " " .. item.name, "Comment")
-        return dim_line
     end
 
     line:append(icon .. " ")

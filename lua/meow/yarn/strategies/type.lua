@@ -118,24 +118,16 @@ function type_hierarchy_strategy.render_node_line(node, hierarchy_instance)
     local icon_map = { [SYMBOL_KIND.Class] = icons.class, [SYMBOL_KIND.Struct] = icons.struct, [SYMBOL_KIND.Interface] = icons.interface }
     local icon = item.is_placeholder and cfg.icons.placeholder or (icon_map[item.kind] or icons.default)
 
+    -- Dim filtered-out nodes; skip custom renderer so the highlight is applied uniformly.
+    if node._filtered_out then
+        line:append(icon .. " " .. item.name, "Comment")
+        return line
+    end
+
     -- Try user-supplied custom renderer first
     local custom_line = util.try_custom_render(node, item, icon, hierarchy_instance)
     if custom_line then
-        if node._filtered_out then
-            -- wrap in Comment highlight to dim filtered nodes
-            local Line = require("nui.line")
-            local Text = require("nui.text")
-            local dimmed = Line()
-            dimmed:append(Text(tostring(custom_line), "Comment"))
-            return dimmed
-        end
         return custom_line
-    end
-
-    if node._filtered_out then
-        local dim_line = Line()
-        dim_line:append(string.rep("  ", math.max(0, node:get_depth() - 1)) .. "  " .. icon .. " " .. item.name, "Comment")
-        return dim_line
     end
 
     line:append(icon .. " ")

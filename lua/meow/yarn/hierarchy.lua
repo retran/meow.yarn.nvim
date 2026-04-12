@@ -539,7 +539,7 @@ function Hierarchy:_apply_filter()
             walk(self.tree:get_nodes(node:get_id()))
             -- Show/hide: nui tree doesn't have a native hide API,
             -- so we mark nodes and let prepare_node render them dimmed.
-            node._filtered_out = query and not matches(node) or false
+            node._filtered_out = (query ~= nil) and not matches(node)
         end
     end
     walk(self.tree:get_nodes())
