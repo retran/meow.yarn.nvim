@@ -43,7 +43,7 @@ local default_config = {
         placeholder = "",
         animation_frames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
     },
-    ---@type { jump: string, toggle: string, expand: string, expand_alt: string, collapse: string, collapse_alt: string, quit: string }
+    ---@type { jump: string, toggle: string, expand: string, expand_alt: string, collapse: string, collapse_alt: string, quit: string, breadcrumb_back: string }
     mappings = {
         jump = "<CR>",
         toggle = "<Tab>",
@@ -54,6 +54,7 @@ local default_config = {
         show_super_hierarchy = "K",
         show_sub_hierarchy = "J",
         quit = "q",
+        breadcrumb_back = "<BS>",
     },
     ---@type number
     expand_depth = 3,
