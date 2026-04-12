@@ -37,10 +37,11 @@ local Hierarchy = {}
 Hierarchy.__index = Hierarchy
 
 --- Builds the breadcrumb string from the history list.
+--- Shows the root item immediately (single entry), and the full trail as you navigate deeper.
 ---@param history table List of { item, direction_key } entries.
----@return string The breadcrumb text, e.g. " [A] > [B] > [C] ".
+---@return string The breadcrumb text, e.g. " [A] > [B] > [C] ", or "" if history is empty.
 local function build_breadcrumb_text(history)
-    if #history <= 1 then return "" end
+    if #history == 0 then return "" end
     local parts = {}
     for _, entry in ipairs(history) do
         table.insert(parts, "[" .. (entry.item.name or "?") .. "]")
@@ -48,25 +49,13 @@ local function build_breadcrumb_text(history)
     return " " .. table.concat(parts, " > ") .. " "
 end
 
---- Returns true if the running Neovim supports float window titles (>= 0.9.0).
-local function supports_float_title()
-    return vim.fn.has("nvim-0.9.0") == 1
-end
-
 --- Updates the tree popup border top text with the current breadcrumb trail.
---- Requires Neovim >= 0.9.0 (float window title support). Silently skipped on
---- older versions — breadcrumb history is still tracked; only the visual
---- display is unavailable.
 ---@param self table The Hierarchy instance.
 local function update_breadcrumb_display(self)
-    if not supports_float_title() then return end
     if not self:is_valid() then return end
+    if not (self.tree_popup.border and self.tree_popup.border.set_text) then return end
     local text = build_breadcrumb_text(self.history)
-    if text == "" then
-        pcall(vim.api.nvim_win_set_config, self.tree_popup.winid, { title = "", title_pos = "left" })
-        return
-    end
-    pcall(vim.api.nvim_win_set_config, self.tree_popup.winid, { title = text, title_pos = "left" })
+    pcall(self.tree_popup.border.set_text, self.tree_popup.border, "top", text, "left")
 end
 
 --- Creates a new Hierarchy instance.
