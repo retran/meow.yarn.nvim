@@ -41,6 +41,8 @@ Ever feel like you're unraveling a tangled ball of yarn when navigating your cod
 - **Live Preview**: Instantly see the relevant code for any item you select in the tree
 - **Jump to Definition**: Press Enter on any item to go directly to its location in the code
 - **Explore Deeper**: Pick any symbol in the tree and make it the new starting point for exploration, or switch directions (e.g., from callers to callees) on the fly
+- **Navigation Breadcrumbs**: A history trail at the top of the tree window tracks your exploration path; press `<BS>` to step back
+- **Custom Node Renderer**: Supply a `render_node` function to fully control how each tree node is displayed
 - **Fast & Non-Blocking**: Fully asynchronous so it won't freeze your Neovim
 - **Built on Solid Foundations**: Powered by Neovim's native LSP and [nui.nvim](https://github.com/MunifTanjim/nui.nvim)
 
@@ -143,6 +145,7 @@ require("meow.yarn").setup({
         collapse = "h",
         collapse_alt = "<Left>",
         quit = "q",
+        breadcrumb_back = "<BS>", -- set to nil to disable
     },
     expand_depth = 3,
     preview_context_lines = 10,
@@ -199,6 +202,7 @@ Inside the hierarchy view, the following default keymappings are available:
 | `l` or `<Right>` | Expand the selected node (`mappings.expand`, `mappings.expand_alt`)       |
 | `h` or `<Left>`  | Collapse the selected node (`mappings.collapse`, `mappings.collapse_alt`) |
 | `K` / `J`        | Open new hierarchy from selected item (K=super/callers, J=sub/callees)    |
+| `<BS>`           | Navigate back in breadcrumb history (`mappings.breadcrumb_back`)          |
 | `q`              | Quit the hierarchy view (`mappings.quit`)                                 |
 
 ---

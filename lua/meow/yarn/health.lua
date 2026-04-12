@@ -32,14 +32,31 @@ local M = {}
 ---@private
 local function check_neovim_version()
     vim.health.start("Neovim version")
-    local version = vim.version()
-    if vim.version.cmp(version, { 0, 10, 0 }) >= 0 then
-        vim.health.ok("Neovim " .. tostring(version) .. " (>= 0.10.0)")
-    elseif vim.fn.has('nvim-0.8.0') == 1 then
-        vim.health.warn("Neovim " .. (version and tostring(version) or "< 0.10.0") .. " - plugin supports 0.8+, but 0.10+ recommended")
-    else
-        vim.health.error("Neovim version >= 0.8.0 is required")
+
+    -- vim.version() and vim.version.cmp() were added in Neovim 0.9.
+    -- On 0.8 we must use vim.fn.has() exclusively to avoid a crash.
+    local has_090 = vim.fn.has("nvim-0.9.0") == 1
+    local has_0100 = vim.fn.has("nvim-0.10.0") == 1
+    local has_080 = vim.fn.has("nvim-0.8.0") == 1
+
+    if not has_080 then
+        vim.health.error("Neovim >= 0.8.0 is required")
         return false
+    end
+
+    local version_str = has_090 and tostring(vim.version()) or "0.8.x"
+
+    if has_0100 then
+        vim.health.ok("Neovim " .. version_str .. " (>= 0.10.0, full feature support)")
+    elseif has_090 then
+        vim.health.ok("Neovim " .. version_str .. " (>= 0.9.0)")
+        vim.health.warn("Neovim 0.10+ is recommended for the best experience")
+    else
+        -- 0.8.x: supported but with caveats
+        vim.health.warn(
+            "Neovim " .. version_str .. " (0.8.x detected)"
+            .. " - plugin is functional, but 0.9.0+ is recommended"
+        )
     end
     return true
 end
@@ -192,6 +209,11 @@ function M.check()
     end
 
     local deps_ok = check_dependencies()
+
+    -- Feature availability — only meaningful once nui.nvim is confirmed present.
+    vim.health.start("Feature availability")
+    vim.health.ok("Breadcrumb titles in tree window (supported on all versions via nui.nvim border)")
+
     local config_ok = check_configuration()
     local lsp_ok = check_lsp_clients()
 

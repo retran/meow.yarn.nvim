@@ -36,6 +36,26 @@ local animation = require("meow.yarn.animation")
 local Hierarchy = {}
 Hierarchy.__index = Hierarchy
 
+-- Builds the breadcrumb string from the history list,
+-- e.g. " [A] > [B] > [C] ".
+local function build_breadcrumb_text(history)
+    if #history == 0 then return "" end
+    local parts = {}
+    for _, entry in ipairs(history) do
+        table.insert(parts, "[" .. (entry.item.name or "?") .. "]")
+    end
+    return " " .. table.concat(parts, " > ") .. " "
+end
+
+-- Updates the tree popup border top text with the current breadcrumb trail.
+local function update_breadcrumb_display(self)
+    if not self:is_valid() then return end
+    local text = build_breadcrumb_text(self.history)
+    pcall(function()
+        self.tree_popup.border:set_text("top", text, "left")
+    end)
+end
+
 --- Creates a new Hierarchy instance.
 ---@param client table The LSP client.
 ---@param root_item table The root item of the hierarchy.
@@ -49,6 +69,7 @@ function Hierarchy:new(client, root_item, strategy, direction_key)
     instance.strategy = strategy
     instance.direction_key = direction_key
     instance.active_requests = {}
+    instance.history = { { item = root_item, direction_key = direction_key } }
 
     local help_text = instance.strategy.generate_help_text(cfg.mappings)
 
@@ -115,6 +136,10 @@ function Hierarchy:mount()
     self:_setup_preview()
     self:_setup_cleanup()
     self.tree:render()
+    -- Defer until after layout:mount() has assigned tree_popup.winid
+    vim.schedule(function()
+        update_breadcrumb_display(self)
+    end)
 end
 
 --- Unmounts the hierarchy UI and cleans up resources.
@@ -138,15 +163,21 @@ function Hierarchy:unmount()
     animation.manage_animation_timer()
 end
 
---- Resets the hierarchy to a new root item and direction.
+--- Resets the hierarchy to a new root item and direction, recording history.
 ---@param root_item table The new root LSP item.
 ---@param direction_key string The new direction key.
-function Hierarchy:reset(root_item, direction_key)
+---@param skip_history? boolean When true, do not append to history (used for back navigation).
+function Hierarchy:reset(root_item, direction_key, skip_history)
     for _, request_id in pairs(self.active_requests) do
         self.client.cancel_request(request_id)
     end
     self.active_requests = {}
     self.direction_key = direction_key
+
+    if not skip_history then
+        table.insert(self.history, { item = root_item, direction_key = direction_key })
+        update_breadcrumb_display(self)
+    end
 
     local Node = require("nui.tree").Node
     local get_item_key = self.strategy.get_item_key or util.default_key_from_item
@@ -164,6 +195,7 @@ function Hierarchy:reset(root_item, direction_key)
     if self:is_valid() then
         vim.api.nvim_win_set_cursor(self.tree_popup.winid, { 1, 0 })
     end
+
     vim.schedule(function()
         if self:is_valid() then
             local cfg = get_config()
@@ -172,8 +204,17 @@ function Hierarchy:reset(root_item, direction_key)
     end)
 end
 
---- Creates the Nui layout for the hierarchy and preview windows.
----@return table The NuiLayout instance.
+--- Navigates back one step in the breadcrumb history.
+function Hierarchy:breadcrumb_back()
+    if #self.history <= 1 then return end
+    table.remove(self.history, #self.history)
+    local prev = self.history[#self.history]
+    -- skip_history=true so reset() does not append prev again; it is already in place.
+    self:reset(prev.item, prev.direction_key, true)
+    update_breadcrumb_display(self)
+end
+
+-- Creates the Nui layout for the hierarchy and preview windows.
 function Hierarchy:_create_layout()
     local cfg = get_config()
     local w, h = cfg.window.width, cfg.window.height
@@ -190,7 +231,7 @@ function Hierarchy:_create_layout()
         Layout.Box({ Layout.Box(self.tree_popup, { size = tree_height }), Layout.Box(self.preview_popup, { size = preview_height }) }, { dir = "col" }))
 end
 
---- Sets up the keymaps for the hierarchy window.
+-- Sets up the keymaps for the hierarchy window.
 function Hierarchy:_setup_keymaps()
     local cfg = get_config()
     local bufnr = self.tree.bufnr
@@ -221,6 +262,11 @@ function Hierarchy:_setup_keymaps()
     map(cfg.mappings.expand_alt, expand_action(true), "Expand (alt)")
     map(cfg.mappings.collapse, function() local n = self.tree:get_node() if n then n:collapse() self.tree:render() end end, "Collapse")
     map(cfg.mappings.collapse_alt, function() local n = self.tree:get_node() if n then n:collapse() self.tree:render() end end, "Collapse (alt)")
+
+    -- Set nil to disable the breadcrumb-back keymap entirely.
+    if cfg.mappings.breadcrumb_back and cfg.mappings.breadcrumb_back ~= "" then
+        map(cfg.mappings.breadcrumb_back, function() self:breadcrumb_back() end, "Navigate back in breadcrumbs")
+    end
 
     local function switch_direction(new_direction_key)
         local node = self.tree:get_node()
@@ -316,7 +362,7 @@ function Hierarchy:update_node(node, depth)
     end)
 end
 
---- Sets up autocommands for cleaning up the hierarchy window.
+-- Sets up autocommands for cleaning up the hierarchy window.
 function Hierarchy:_setup_cleanup()
     vim.api.nvim_create_autocmd({ "BufWipeout" }, {
         group = self.autocmd_group,
@@ -326,7 +372,7 @@ function Hierarchy:_setup_cleanup()
     })
 end
 
---- Sets up the preview window and its autocommands.
+-- Sets up the preview window and its autocommands.
 function Hierarchy:_setup_preview()
     local K = require("meow.yarn.util").K
     local preview_ns = vim.api.nvim_create_namespace(K.PREVIEW_NAMESPACE)
@@ -353,14 +399,14 @@ function Hierarchy:_setup_preview()
             local last_line = math.min(vim.api.nvim_buf_line_count(source_bufnr), start_line_0 + ctx + 1)
             local lines = vim.api.nvim_buf_get_lines(source_bufnr, first_line, last_line, false)
 
-            vim.api.nvim_buf_set_option(pbuf, "readonly", false)
-            vim.api.nvim_buf_set_option(pbuf, "modifiable", true)
+            vim.bo[pbuf].readonly = false
+            vim.bo[pbuf].modifiable = true
             vim.api.nvim_buf_clear_namespace(pbuf, preview_ns, 0, -1)
             vim.api.nvim_buf_set_lines(pbuf, 0, -1, false, lines)
             local highlight_line = start_line_0 - first_line
             vim.api.nvim_buf_add_highlight(pbuf, preview_ns, K.HIGHLIGHT_GROUP, highlight_line, 0, -1)
-            vim.api.nvim_buf_set_option(pbuf, "modifiable", false)
-            vim.api.nvim_buf_set_option(pbuf, "readonly", true)
+            vim.bo[pbuf].modifiable = false
+            vim.bo[pbuf].readonly = true
             vim.api.nvim_win_set_cursor(self.preview_popup.winid, { highlight_line + 1, 0 })
             vim.api.nvim_win_call(self.preview_popup.winid, function() vim.cmd("normal! zt") end)
         end)
