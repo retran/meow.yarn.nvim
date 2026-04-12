@@ -1,17 +1,12 @@
-# Lua/Neovim
-.luarc.json
+# Lua LSP / tooling overrides (machine-local)
+.luarc.json.bak
 .stylua.toml.bak
 
-# OS generated files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Editor files
+# Editor
 .vscode/
 .idea/
 *.swp
@@ -20,23 +15,15 @@ Thumbs.db
 
 # Logs
 *.log
-logs/
 
-# Testing
+# Test artifacts
 test-results/
 coverage/
 
-# Temporary files
-tmp/
-temp/
+# Temp
 *.tmp
+*.bak
 
-# LuaRocks build artifacts
+# LuaRocks artifacts
 *.rock
 *.rockspec.bak
-
-# Example build artifacts (if any)
-examples/*.out
-examples/*.exe
-examples/go.mod
-examples/go.sum
