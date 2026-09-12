@@ -33,5 +33,6 @@ dependencies = {
    "nui.nvim"
 }
 build = {
-   type = "builtin"
+   type = "builtin",
+   copy_directories = { "doc", "plugin" }
 }
