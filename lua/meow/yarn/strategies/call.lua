@@ -80,7 +80,14 @@ function call_hierarchy_strategy.fetch_children(client, item, direction_key, cal
     util.lsp.request_async(client, method, { item = item }, req_buf, function(results)
         if not results then return callback(nil) end
         local children_items = vim.tbl_map(function(result)
-            return direction_key == "callers" and result.from or result.to
+            local child = direction_key == "callers" and result.from or result.to
+            -- For incoming calls `fromRanges` are the call sites inside the caller
+            -- itself, so they can be used for jumping / previewing. For outgoing
+            -- calls they point into the *parent* file, so they are ignored there.
+            if direction_key == "callers" and type(result.fromRanges) == "table" and #result.fromRanges > 0 then
+                child = vim.tbl_extend("force", child, { call_site_ranges = result.fromRanges })
+            end
+            return child
         end, results)
         callback(children_items)
     end)
@@ -94,7 +101,12 @@ function call_hierarchy_strategy.generate_help_text(mappings)
     -- Use display names from directions
     table.insert(dir_maps, string.format("[%s]%s", mappings.show_super_hierarchy, call_hierarchy_strategy.directions.callers.display_name))
     table.insert(dir_maps, string.format("[%s]%s", mappings.show_sub_hierarchy, call_hierarchy_strategy.directions.callees.display_name))
-    return string.format("[%s]Jump | [%s]Toggle | %s | [%s]Quit", mappings.jump, mappings.toggle, table.concat(dir_maps, " | "), mappings.quit)
+    local select_hint = ""
+    if type(mappings.toggle_select) == "string" and mappings.toggle_select ~= "" then
+        select_hint = string.format("[%s]Select | ", mappings.toggle_select)
+    end
+    return string.format("[%s]Jump | [%s]Toggle | %s%s | [%s]Quit", mappings.jump, mappings.toggle, select_hint,
+        table.concat(dir_maps, " | "), mappings.quit)
 end
 
 --- Renders a single line in the call hierarchy tree.
@@ -128,9 +140,11 @@ function call_hierarchy_strategy.render_node_line(node, hierarchy_instance)
     local kind_name = lsp_kind_to_name[item.kind]
     local icon = item.is_placeholder and cfg.icons.placeholder or (kind_name and icons[kind_name] or icons.default)
 
+    local marker = util.selection_marker(node, hierarchy_instance)
+
     -- Dim filtered-out nodes; skip custom renderer so the highlight is applied uniformly.
     if node._filtered_out then
-        line:append(icon .. " " .. item.name, "Comment")
+        line:append(marker .. icon .. " " .. util.sanitize_text(item.name), "Comment")
         return line
     end
 
@@ -140,11 +154,12 @@ function call_hierarchy_strategy.render_node_line(node, hierarchy_instance)
         return custom_line
     end
 
+    line:append(marker, "Statement")
     line:append(icon .. " ")
-    line:append(item.name)
+    line:append(util.sanitize_text(item.name))
 
     if item.detail and item.detail ~= "" then
-        line:append(" " .. item.detail, "Comment")
+        line:append(" " .. util.sanitize_text(item.detail), "Comment")
     end
 
     if node:get_depth() == 1 then
@@ -154,9 +169,15 @@ function call_hierarchy_strategy.render_node_line(node, hierarchy_instance)
 
     if item.is_placeholder then return line end
 
+    local call_sites = item.call_site_ranges
+    if call_sites and #call_sites > 1 then
+        line:append(string.format(" (%d calls)", #call_sites), "Comment")
+    end
+
     local file = item.uri and vim.uri_to_fname(item.uri)
     if file then
-        local sel = (item.selectionRange and item.selectionRange.start) or (item.range and item.range.start)
+        local item_range = util.item_range(item)
+        local sel = item_range and item_range.start
         local rhs = ("  %s"):format(util.short_path(file))
         if sel then rhs = rhs .. (":" .. (sel.line + 1)) end
         line:append(" ")

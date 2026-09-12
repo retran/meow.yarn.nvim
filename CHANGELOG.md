@@ -2,6 +2,24 @@
 
 All notable changes to meow.yarn.nvim are documented here.
 
+## [0.1.5] - 2026-09-12
+
+### Added
+
+- **Multi-selection** — press `<Space>` to mark nodes (the cursor advances, so repeated presses select consecutive items); selected nodes get a marker and the count is shown in the top-right border (`mappings.toggle_select`, `mappings.clear_selection`)
+- **Send to quickfix / trouble.nvim** — `<C-q>` (or `<CR>` with a non-empty selection) sends every selected node to the quickfix list; when [trouble.nvim](https://github.com/folke/trouble.nvim) is installed it is opened instead of the built-in window (`mappings.send_to_quickfix`, `quickfix.use_trouble`) — requested in [#18](https://github.com/retran/meow.yarn.nvim/issues/18)
+- **Jump to the call site** — for incoming calls the LSP `fromRanges` are now used for jumping, previewing, yanking and quickfix entries, so `<CR>` lands on the line where the call actually happens; callers that call the symbol more than once show `(N calls)` — idea adopted from [@qufeiyan](https://github.com/qufeiyan)'s [#9](https://github.com/retran/meow.yarn.nvim/pull/9)
+- `icons.selected` option for the multi-selection marker
+
+### Fixed
+
+- Crash while rendering symbols whose name or detail contains newlines or other control characters (`'replacement string' item contains newlines`), reproducible with rust-analyzer — all LSP strings are now flattened to a single line before rendering ([#17](https://github.com/retran/meow.yarn.nvim/issues/17))
+
+### Documentation
+
+- README and `:help meow-yarn` brought up to date with every option and mapping added in 0.1.4 and 0.1.5
+- Acknowledgments section crediting everyone who reported an issue or contributed an idea
+
 ## [0.1.4] - 2026-04-12
 
 ### Added

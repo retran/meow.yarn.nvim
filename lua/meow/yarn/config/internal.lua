@@ -38,13 +38,14 @@ local default_config = {
         preview_height_ratio = 0.35,
         layout = "vertical",
     },
-    ---@type { loading: string, placeholder: string, animation_frames: string[] }
+    ---@type { loading: string, placeholder: string, selected: string, animation_frames: string[] }
     icons = {
         loading = "",
         placeholder = "",
+        selected = "●",
         animation_frames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
     },
-    ---@type { jump: string, toggle: string, expand: string, expand_alt: string, collapse: string, collapse_alt: string, show_super_hierarchy: string, show_sub_hierarchy: string, quit: string, breadcrumb_back: string|nil, yank_path: string|nil, expand_all: string|nil, collapse_all: string|nil, filter: string|nil, preview_scroll_down: string|nil, preview_scroll_up: string|nil, sort: string|nil }
+    ---@type { jump: string, toggle: string, expand: string, expand_alt: string, collapse: string, collapse_alt: string, show_super_hierarchy: string, show_sub_hierarchy: string, quit: string, breadcrumb_back: string|nil, yank_path: string|nil, expand_all: string|nil, collapse_all: string|nil, filter: string|nil, preview_scroll_down: string|nil, preview_scroll_up: string|nil, sort: string|nil, toggle_select: string|nil, clear_selection: string|nil, send_to_quickfix: string|nil }
     mappings = {
         jump = "<CR>",
         toggle = "<Tab>",
@@ -63,6 +64,13 @@ local default_config = {
         preview_scroll_down = "<C-d>",
         preview_scroll_up = "<C-u>",
         sort = "s",
+        toggle_select = "<Space>",
+        clear_selection = "<Esc>",
+        send_to_quickfix = "<C-q>",
+    },
+    ---@type { use_trouble: boolean }
+    quickfix = {
+        use_trouble = true,
     },
     ---@type boolean
     keep_open_on_jump = false,
@@ -105,6 +113,7 @@ function M.validate(cfg)
         { "vim.g.meow_yarn.preview_context_lines", cfg.preview_context_lines, "number" },
         { "vim.g.meow_yarn.animation_speed",       cfg.animation_speed,       "number" },
         { "vim.g.meow_yarn.hierarchies",           cfg.hierarchies,           "table" },
+        { "vim.g.meow_yarn.quickfix",              cfg.quickfix,              "table" },
     }
     for _, spec in ipairs(fields) do
         local ok, err = pcall(vim.validate, spec[1], spec[2], spec[3])

@@ -109,6 +109,21 @@ function M.lsp.get_encoding(client)
     return type(encoding) == "string" and encoding or "utf-8"
 end
 
+--- Resolves the range to use when jumping to / previewing an LSP item.
+--- Incoming-call items carry `call_site_ranges` (the LSP `fromRanges`), i.e. the
+--- exact positions where the call happens inside the caller; preferring them
+--- matches the behaviour of VS Code's "show call hierarchy".
+---@param item table|nil The LSP item.
+---@return table|nil The range to use, or nil when the item has none.
+function M.item_range(item)
+    if not item then return nil end
+    local ranges = item.call_site_ranges
+    if type(ranges) == "table" and ranges[1] then
+        return ranges[1]
+    end
+    return item.selectionRange or item.range
+end
+
 --- Jumps to the location specified by an LSP item.
 ---@param lsp_item table The LSP item with URI and range.
 ---@param client table The LSP client, used for offset encoding.
@@ -116,7 +131,7 @@ function M.jump_to_item(lsp_item, client)
     if not lsp_item or not lsp_item.uri then
         return
     end
-    local range = lsp_item.selectionRange or lsp_item.range
+    local range = M.item_range(lsp_item)
     if not range then
         return
     end
@@ -151,11 +166,90 @@ function M.unique_id_for(tree, base_id)
     return id
 end
 
+--- Flattens a string into a single display line.
+--- LSP servers (notably rust-analyzer) may return item names or details that
+--- contain newlines; passing those to nui/`nvim_buf_set_lines` raises
+--- "'replacement string' item contains newlines", so every string that ends up
+--- in a tree line must go through this first.
+---@param s string|nil The raw string.
+---@return string A single-line string with control characters collapsed into spaces.
+function M.sanitize_text(s)
+    if type(s) ~= "string" then return "" end
+    -- Replace any newline / carriage return / tab / other control char with a space.
+    local flat = s:gsub("%c", " ")
+    -- Collapse runs of whitespace and trim.
+    flat = flat:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    return flat
+end
+
 --- Shortens a file path for display.
 ---@param p string The full file path.
 ---@return string The shortened path.
 function M.short_path(p)
     return p and vim.fn.fnamemodify(p, ":~:.") or ""
+end
+
+--- Builds the selection marker prefix for a node.
+--- Returns the configured marker icon when the node is part of the multi-selection,
+--- an equally wide blank otherwise, so lines stay aligned.
+---@param node table The NuiTree node.
+---@param hierarchy_instance table|nil The Hierarchy instance holding the selection.
+---@return string The marker prefix.
+function M.selection_marker(node, hierarchy_instance)
+    if not (hierarchy_instance and hierarchy_instance.selection) then return "" end
+    if vim.tbl_isempty(hierarchy_instance.selection) then return "" end
+    local cfg = require("meow.yarn.config.internal").get()
+    local icon = cfg.icons.selected or "*"
+    local marker = hierarchy_instance.selection[node:get_id()] and icon or " "
+    return marker .. " "
+end
+
+--- Converts LSP items into quickfix entries.
+---@param items table[] List of LSP hierarchy items.
+---@return table[] Quickfix entries.
+function M.items_to_qf(items)
+    local entries = {}
+    for _, item in ipairs(items) do
+        if item and item.uri and not item.is_placeholder then
+            local range = M.item_range(item)
+            local start = range and range.start or { line = 0, character = 0 }
+            table.insert(entries, {
+                filename = vim.uri_to_fname(item.uri),
+                lnum = start.line + 1,
+                col = start.character + 1,
+                text = M.sanitize_text(item.name) ..
+                    ((item.detail and item.detail ~= "") and (" " .. M.sanitize_text(item.detail)) or ""),
+            })
+        end
+    end
+    return entries
+end
+
+--- Sends LSP items to the quickfix list and opens it.
+--- Uses trouble.nvim when it is installed and not disabled via `quickfix.use_trouble`.
+---@param items table[] List of LSP hierarchy items.
+---@param title string The quickfix list title.
+---@return number The number of entries added.
+function M.send_to_quickfix(items, title)
+    local entries = M.items_to_qf(items)
+    if #entries == 0 then
+        vim.notify("MeowYarn: nothing to send to the quickfix list.", vim.log.levels.WARN)
+        return 0
+    end
+    vim.fn.setqflist({}, " ", { title = title or "MeowYarn", items = entries })
+
+    local cfg = require("meow.yarn.config.internal").get()
+    if cfg.quickfix and cfg.quickfix.use_trouble then
+        local has_trouble, trouble = pcall(require, "trouble")
+        if has_trouble then
+            -- trouble.nvim v3 takes an opts table; v2 takes a mode string.
+            local ok = pcall(trouble.open, { mode = "quickfix", focus = true })
+            if not ok then ok = pcall(trouble.open, "quickfix") end
+            if ok then return #entries end
+        end
+    end
+    vim.cmd("copen")
+    return #entries
 end
 
 --- LSP kind number to human-readable name mapping.
@@ -182,16 +276,17 @@ function M.try_custom_render(node, item, icon, hierarchy_instance)
     if type(cfg.render_node) ~= "function" then return nil end
 
     local file = item.uri and vim.uri_to_fname(item.uri) or nil
-    local sel = (item.selectionRange and item.selectionRange.start) or (item.range and item.range.start)
+    local item_range = M.item_range(item)
+    local sel = item_range and item_range.start
 
     ---@type meow.yarn.NodeInfo
     local node_info = {
-        name = item.name or "",
+        name = M.sanitize_text(item.name),
         kind = M.LSP_KIND_NAMES[item.kind] or "Unknown",
         icon = icon,
         file = file and M.short_path(file) or nil,
         line = sel and (sel.line + 1) or nil,
-        detail = (item.detail and item.detail ~= "") and item.detail or nil,
+        detail = (item.detail and item.detail ~= "") and M.sanitize_text(item.detail) or nil,
         depth = node:get_depth(),
         is_loading = node.loading or false,
         is_placeholder = item.is_placeholder or false,
@@ -209,7 +304,7 @@ function M.try_custom_render(node, item, icon, hierarchy_instance)
 
     local Line = require("nui.line")
     local line = Line()
-    line:append(result)
+    line:append(M.sanitize_text(result))
     return line
 end
 

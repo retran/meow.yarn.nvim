@@ -88,7 +88,12 @@ function type_hierarchy_strategy.generate_help_text(mappings)
     -- Use display names from directions
     table.insert(dir_maps, string.format("[%s]%s", mappings.show_super_hierarchy, type_hierarchy_strategy.directions.supertypes.display_name))
     table.insert(dir_maps, string.format("[%s]%s", mappings.show_sub_hierarchy, type_hierarchy_strategy.directions.subtypes.display_name))
-    return string.format("[%s]Jump | [%s]Toggle | %s | [%s]Quit", mappings.jump, mappings.toggle, table.concat(dir_maps, " | "), mappings.quit)
+    local select_hint = ""
+    if type(mappings.toggle_select) == "string" and mappings.toggle_select ~= "" then
+        select_hint = string.format("[%s]Select | ", mappings.toggle_select)
+    end
+    return string.format("[%s]Jump | [%s]Toggle | %s%s | [%s]Quit", mappings.jump, mappings.toggle, select_hint,
+        table.concat(dir_maps, " | "), mappings.quit)
 end
 
 --- Renders a single line in the type hierarchy tree.
@@ -118,9 +123,11 @@ function type_hierarchy_strategy.render_node_line(node, hierarchy_instance)
     local icon_map = { [SYMBOL_KIND.Class] = icons.class, [SYMBOL_KIND.Struct] = icons.struct, [SYMBOL_KIND.Interface] = icons.interface }
     local icon = item.is_placeholder and cfg.icons.placeholder or (icon_map[item.kind] or icons.default)
 
+    local marker = util.selection_marker(node, hierarchy_instance)
+
     -- Dim filtered-out nodes; skip custom renderer so the highlight is applied uniformly.
     if node._filtered_out then
-        line:append(icon .. " " .. item.name, "Comment")
+        line:append(marker .. icon .. " " .. util.sanitize_text(item.name), "Comment")
         return line
     end
 
@@ -130,8 +137,9 @@ function type_hierarchy_strategy.render_node_line(node, hierarchy_instance)
         return custom_line
     end
 
+    line:append(marker, "Statement")
     line:append(icon .. " ")
-    line:append(item.name)
+    line:append(util.sanitize_text(item.name))
 
     if node:get_depth() == 1 then
         local dir_info = type_hierarchy_strategy.directions[hierarchy_instance.direction_key]
@@ -142,7 +150,8 @@ function type_hierarchy_strategy.render_node_line(node, hierarchy_instance)
 
     local file = item.uri and vim.uri_to_fname(item.uri)
     if file then
-        local sel = (item.selectionRange and item.selectionRange.start) or (item.range and item.range.start)
+        local item_range = util.item_range(item)
+        local sel = item_range and item_range.start
         local rhs = ("  %s"):format(util.short_path(file))
         if sel then rhs = rhs .. (":" .. (sel.line + 1)) end
         line:append(" ")

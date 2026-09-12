@@ -39,8 +39,9 @@
 
 ---@class meow.yarn.Config
 ---@field window? { width?: number, height?: number, border?: string, preview_height_ratio?: number, layout?: "vertical"|"horizontal" }
----@field icons? { loading?: string, placeholder?: string, animation_frames?: string[] }
----@field mappings? { jump?: string, toggle?: string, expand?: string, expand_alt?: string, collapse?: string, collapse_alt?: string, show_super_hierarchy?: string, show_sub_hierarchy?: string, quit?: string, breadcrumb_back?: string|nil, yank_path?: string|nil, expand_all?: string|nil, collapse_all?: string|nil, filter?: string|nil, preview_scroll_down?: string|nil, preview_scroll_up?: string|nil, sort?: string|nil }
+---@field icons? { loading?: string, placeholder?: string, selected?: string, animation_frames?: string[] }
+---@field mappings? { jump?: string, toggle?: string, expand?: string, expand_alt?: string, collapse?: string, collapse_alt?: string, show_super_hierarchy?: string, show_sub_hierarchy?: string, quit?: string, breadcrumb_back?: string|nil, yank_path?: string|nil, expand_all?: string|nil, collapse_all?: string|nil, filter?: string|nil, preview_scroll_down?: string|nil, preview_scroll_up?: string|nil, sort?: string|nil, toggle_select?: string|nil, clear_selection?: string|nil, send_to_quickfix?: string|nil }
+---@field quickfix? { use_trouble?: boolean } Send selections to trouble.nvim when it is installed (default `true`); set `use_trouble = false` to always use the built-in quickfix window.
 ---@field keep_open_on_jump? boolean
 ---@field expand_depth? number
 ---@field preview_context_lines? number

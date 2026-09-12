@@ -4,6 +4,7 @@ lsp	meow-yarn.txt	/*lsp*
 meow-yarn	meow-yarn.txt	/*meow-yarn*
 meow-yarn-acknowledgments	meow-yarn.txt	/*meow-yarn-acknowledgments*
 meow-yarn-breadcrumbs	meow-yarn.txt	/*meow-yarn-breadcrumbs*
+meow-yarn-call-sites	meow-yarn.txt	/*meow-yarn-call-sites*
 meow-yarn-commands	meow-yarn.txt	/*meow-yarn-commands*
 meow-yarn-configuration	meow-yarn.txt	/*meow-yarn-configuration*
 meow-yarn-contents	meow-yarn.txt	/*meow-yarn-contents*
@@ -21,6 +22,7 @@ meow-yarn-prerequisites	meow-yarn.txt	/*meow-yarn-prerequisites*
 meow-yarn-quick-start	meow-yarn.txt	/*meow-yarn-quick-start*
 meow-yarn-render-node	meow-yarn.txt	/*meow-yarn-render-node*
 meow-yarn-scroll-preview	meow-yarn.txt	/*meow-yarn-scroll-preview*
+meow-yarn-selection	meow-yarn.txt	/*meow-yarn-selection*
 meow-yarn-sort	meow-yarn.txt	/*meow-yarn-sort*
 meow-yarn.txt	meow-yarn.txt	/*meow-yarn.txt*
 meow.yarn	meow-yarn.txt	/*meow.yarn*

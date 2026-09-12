@@ -44,7 +44,7 @@ local function build_breadcrumb_text(history)
     if #history == 0 then return "" end
     local parts = {}
     for _, entry in ipairs(history) do
-        table.insert(parts, "[" .. (entry.item.name or "?") .. "]")
+        table.insert(parts, "[" .. util.sanitize_text(entry.item.name or "?") .. "]")
     end
     return " " .. table.concat(parts, " > ") .. " "
 end
@@ -83,6 +83,10 @@ local function update_position_display(self)
     local total = count_visible_nodes(self)
     local row = vim.api.nvim_win_get_cursor(self.tree_popup.winid)[1]
     local text = string.format(" %d/%d ", row, total)
+    local selected = self.selection_order and #self.selection_order or 0
+    if selected > 0 then
+        text = string.format(" %d/%d · %d selected ", row, total, selected)
+    end
     pcall(self.tree_popup.border.set_text, self.tree_popup.border, "top", text, "right")
 end
 
@@ -134,6 +138,9 @@ function Hierarchy:new(client, root_item, strategy, direction_key)
     instance.direction_key = direction_key
     instance.active_requests = {}
     instance.sort_order = "lsp"
+    -- Multi-selection: map of node id -> lsp_item, plus insertion order.
+    instance.selection = {}
+    instance.selection_order = {}
     -- Navigation history: list of { item = <lsp_item>, direction_key = <string>, cursor_node_id = <string|nil> }
     instance.history = { { item = root_item, direction_key = direction_key } }
 
@@ -167,7 +174,7 @@ function Hierarchy:new(client, root_item, strategy, direction_key)
     local get_item_key = instance.strategy.get_item_key or util.default_key_from_item
     local root_node_obj = Node({
         id = get_item_key(root_item),
-        text = root_item.name,
+        text = util.sanitize_text(root_item.name),
         lsp_item = root_item,
         dir_key = direction_key,
         fetched = false,
@@ -255,12 +262,13 @@ function Hierarchy:reset(root_item, direction_key, skip_history, restore_node_id
     end
 
     self.filter_text = nil
+    self:clear_selection(true)
 
     local Node = require("nui.tree").Node
     local get_item_key = self.strategy.get_item_key or util.default_key_from_item
     local new_root_node = Node({
         id = get_item_key(root_item),
-        text = root_item.name,
+        text = util.sanitize_text(root_item.name),
         lsp_item = root_item,
         dir_key = direction_key,
         fetched = false,
@@ -332,8 +340,11 @@ function Hierarchy:_setup_keymaps()
 
     map(cfg.mappings.quit, function() self:unmount() end, "Quit")
 
-    -- Jump to definition
+    -- Jump to definition (or open every selected item at once)
     map(cfg.mappings.jump, function()
+        if #self.selection_order > 0 then
+            return self:send_selection_to_quickfix()
+        end
         local node = self.tree:get_node()
         if node and node.lsp_item and not node.lsp_item.is_placeholder then
             local item_to_jump = node.lsp_item
@@ -353,7 +364,8 @@ function Hierarchy:_setup_keymaps()
             if node and node.lsp_item and node.lsp_item.uri and not node.lsp_item.is_placeholder then
                 local item = node.lsp_item
                 local file = vim.uri_to_fname(item.uri)
-                local sel = (item.selectionRange and item.selectionRange.start) or (item.range and item.range.start)
+                local item_range = util.item_range(item)
+                local sel = item_range and item_range.start
                 local text = sel and (file .. ":" .. (sel.line + 1)) or file
                 vim.fn.setreg("+", text)
                 vim.fn.setreg('"', text)
@@ -389,6 +401,18 @@ function Hierarchy:_setup_keymaps()
     end
     if type(cfg.mappings.collapse_all) == "string" and cfg.mappings.collapse_all ~= "" then
         map(cfg.mappings.collapse_all, function() self:_expand_collapse_all(false) end, "Collapse all nodes")
+    end
+
+    -- Multi-selection
+    if type(cfg.mappings.toggle_select) == "string" and cfg.mappings.toggle_select ~= "" then
+        map(cfg.mappings.toggle_select, function() self:toggle_selection() end, "Toggle selection")
+    end
+    if type(cfg.mappings.clear_selection) == "string" and cfg.mappings.clear_selection ~= "" then
+        map(cfg.mappings.clear_selection, function() self:clear_selection() end, "Clear selection")
+    end
+    if type(cfg.mappings.send_to_quickfix) == "string" and cfg.mappings.send_to_quickfix ~= "" then
+        map(cfg.mappings.send_to_quickfix, function() self:send_selection_to_quickfix() end,
+            "Send selection to quickfix / trouble")
     end
 
     -- Search / filter
@@ -451,6 +475,80 @@ function Hierarchy:_setup_keymaps()
             switch_direction("callers")
         end
     end, "Show Super-Hierarchy")
+end
+
+--- Toggles multi-selection for the node under the cursor and moves one line down.
+function Hierarchy:toggle_selection()
+    local node = self.tree:get_node()
+    if not node or not node.lsp_item or node.lsp_item.is_placeholder then return end
+    local id = node:get_id()
+    if self.selection[id] then
+        self.selection[id] = nil
+        for i, sel_id in ipairs(self.selection_order) do
+            if sel_id == id then
+                table.remove(self.selection_order, i)
+                break
+            end
+        end
+    else
+        self.selection[id] = node.lsp_item
+        table.insert(self.selection_order, id)
+    end
+    self.tree:render()
+    update_position_display(self)
+    -- Move down so repeated presses select consecutive nodes.
+    if self:is_valid() then
+        local row = vim.api.nvim_win_get_cursor(self.tree_popup.winid)[1]
+        if row < count_visible_nodes(self) then
+            vim.api.nvim_win_set_cursor(self.tree_popup.winid, { row + 1, 0 })
+        end
+    end
+end
+
+--- Clears the multi-selection.
+---@param silent? boolean When true, skip the re-render and notification (used on reset).
+function Hierarchy:clear_selection(silent)
+    self.selection = {}
+    self.selection_order = {}
+    if silent then return end
+    self.tree:render()
+    update_position_display(self)
+end
+
+--- Returns the currently selected LSP items in selection order.
+--- Falls back to the node under the cursor when nothing is selected.
+---@return table[] items
+function Hierarchy:selected_items()
+    local items = {}
+    for _, id in ipairs(self.selection_order) do
+        local item = self.selection[id]
+        if item and not item.is_placeholder then table.insert(items, item) end
+    end
+    if #items == 0 then
+        local node = self.tree:get_node()
+        if node and node.lsp_item and not node.lsp_item.is_placeholder then
+            table.insert(items, node.lsp_item)
+        end
+    end
+    return items
+end
+
+--- Sends the selected items (or the node under the cursor) to the quickfix list,
+--- opening trouble.nvim instead when it is available.
+function Hierarchy:send_selection_to_quickfix()
+    local items = self:selected_items()
+    if #items == 0 then
+        return vim.notify("MeowYarn: nothing to send to the quickfix list.", vim.log.levels.WARN)
+    end
+    local title = string.format("MeowYarn: %s (%s)", self.strategy.name, self.direction_key)
+    local cfg = get_config()
+    if not cfg.keep_open_on_jump then
+        self:unmount()
+    end
+    local count = util.send_to_quickfix(items, title)
+    if count > 0 then
+        vim.notify(string.format("MeowYarn: sent %d item(s) to the quickfix list.", count), vim.log.levels.INFO)
+    end
 end
 
 --- Recursively expands or collapses all nodes in the tree.
@@ -597,7 +695,7 @@ function Hierarchy:update_node(node, depth, restore_node_id)
                 local path_dependent_id = node_id .. "->" .. base_id
                 table.insert(child_nodes, Node({
                     id = util.unique_id_for(self.tree, path_dependent_id),
-                    text = child_item.name,
+                    text = util.sanitize_text(child_item.name),
                     lsp_item = child_item,
                     dir_key = parent.dir_key,
                     fetched = false,
@@ -667,7 +765,7 @@ function Hierarchy:_setup_preview()
                 vim.fn.bufload(source_bufnr)
             end
             vim.bo[pbuf].filetype = vim.bo[source_bufnr].filetype
-            local start_line_0 = (lsp_item.selectionRange or lsp_item.range).start.line
+            local start_line_0 = util.item_range(lsp_item).start.line
             local cfg = get_config()
             local ctx = cfg.preview_context_lines
             local first_line = math.max(0, start_line_0 - ctx)

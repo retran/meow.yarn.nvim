@@ -94,6 +94,14 @@ local function check_dependencies()
         all_ok = false
     end
 
+    -- Optional: trouble.nvim is used for the quickfix integration when present
+    local has_trouble = pcall(require, "trouble")
+    if has_trouble then
+        vim.health.ok("trouble.nvim is installed (used for the quickfix integration)")
+    else
+        vim.health.info("trouble.nvim is not installed (optional; the built-in quickfix window is used instead)")
+    end
+
     return all_ok
 end
 

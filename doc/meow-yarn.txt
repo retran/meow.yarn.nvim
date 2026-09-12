@@ -1,4 +1,4 @@
-*meow-yarn.txt*	For Neovim >= 0.8.0	Last change: 2026 April 12
+*meow-yarn.txt*	For Neovim >= 0.8.0	Last change: 2026 September 12
 
 MEOW.YARN.NVIM				*meow.yarn* *meow-yarn*
 
@@ -25,12 +25,13 @@ CONTENTS					*meow-yarn-contents*
 8. Search / Filter			|meow-yarn-filter|
 9. Sort Order				|meow-yarn-sort|
 10. Scroll Preview			|meow-yarn-scroll-preview|
-11. Mappings				|meow-yarn-mappings|
+11. Multi-Selection & Quickfix		|meow-yarn-selection|
+12. Mappings				|meow-yarn-mappings|
     - In-Window Mappings		|meow-yarn-in-window-mappings|
-12. Commands				|meow-yarn-commands|
-13. Contributing			|meow-yarn-contributing|
-14. License				|meow-yarn-license|
-15. Acknowledgments			|meow-yarn-acknowledgments|
+13. Commands				|meow-yarn-commands|
+14. Contributing			|meow-yarn-contributing|
+15. License				|meow-yarn-license|
+16. Acknowledgments			|meow-yarn-acknowledgments|
 
 ==============================================================================
 INTRODUCTION					*meow-yarn-introduction*
@@ -77,6 +78,11 @@ KEY FEATURES					*meow-yarn-features*
 - *Sticky Cursor on Back-Navigation*: Pressing `<BS>` to go back
   automatically places the cursor on the node you drilled into, so you never
   lose your place.
+- *Multi-Selection*: Press `<Space>` to mark several nodes and send them all
+  at once to the quickfix list — or to `trouble.nvim` when it is installed.
+- *Jump to the Call Site*: For incoming calls the plugin jumps to (and
+  previews) the exact line where the call happens, not just the caller's
+  declaration, and shows how many calls a caller makes.
 - *Custom Node Renderer*: Supply a `render_node` function in your config to
   fully control how each tree node is displayed.
 - *Fast & Non-Blocking*: Fully asynchronous so it won't freeze your Neovim.
@@ -174,6 +180,8 @@ function. Here are the defaults:
 	    icons = {
 	        loading = "",
 	        placeholder = "",
+	        -- Marker drawn next to multi-selected nodes.
+	        selected = "●",
 	        animation_frames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
 	    },
 	    mappings = {
@@ -196,15 +204,25 @@ function. Here are the defaults:
 	        -- Set to nil to disable.
 	        expand_all = "zO",
 	        collapse_all = "zC",
-        -- Open filter prompt. Set to nil to disable.
-        filter = "/",
-        -- Scroll the preview pane without leaving the tree window.
-        -- Set to nil to disable.
-        preview_scroll_down = "<C-d>",
-        preview_scroll_up = "<C-u>",
-        -- Cycle node sort order (lsp → alpha → file). Set to nil to disable.
-        sort = "s",
-    },
+	        -- Open filter prompt. Set to nil to disable.
+	        filter = "/",
+	        -- Scroll the preview pane without leaving the tree window.
+	        -- Set to nil to disable.
+	        preview_scroll_down = "<C-d>",
+	        preview_scroll_up = "<C-u>",
+	        -- Cycle node sort order (lsp → alpha → file).
+	        -- Set to nil to disable.
+	        sort = "s",
+	        -- Multi-selection. Set any of these to nil to disable.
+	        toggle_select = "<Space>",
+	        clear_selection = "<Esc>",
+	        send_to_quickfix = "<C-q>",
+	    },
+	    quickfix = {
+	        -- Open trouble.nvim (when installed) instead of the built-in
+	        -- quickfix window. Set to false to always use :copen.
+	        use_trouble = true,
+	    },
 	    -- When true, the hierarchy window stays open after pressing <CR>
 	    -- to jump to a symbol. Default: false (window closes on jump).
 	    keep_open_on_jump = false,
@@ -396,6 +414,38 @@ The `node_info` table passed to `render_node` has these fields:
 <
 
 ==============================================================================
+MULTI-SELECTION & QUICKFIX		*meow-yarn-selection*
+
+Press `<Space>` (default `mappings.toggle_select`) to mark the node under the
+cursor; the cursor then moves down one line, so repeated presses select
+consecutive nodes. Selected nodes are prefixed with the `icons.selected`
+marker and the selection count is shown in the top-right border corner.
+
+- `<C-q>` (`mappings.send_to_quickfix`) sends every selected node to the
+  quickfix list. With nothing selected it sends the node under the cursor.
+- `<CR>` on a non-empty selection does the same thing, so "open them all at
+  once" works with the usual jump key.
+- `<Esc>` (`mappings.clear_selection`) clears the selection.
+- The selection is cleared whenever you navigate to a new root.
+
+When `trouble.nvim` (https://github.com/folke/trouble.nvim) is installed, the
+quickfix list is opened with it instead of the built-in window. Set
+`quickfix.use_trouble = false` to always use `:copen`:
+>
+	require("meow.yarn").setup({
+	    quickfix = { use_trouble = false },
+	})
+<
+Like the jump mapping, sending to quickfix closes the hierarchy window unless
+`keep_open_on_jump = true`.
+
+						*meow-yarn-call-sites*
+For call hierarchies in the `callers` direction, the language server reports
+the ranges where each caller actually calls the symbol. `meow.yarn.nvim` uses
+the first of them for jumping, previewing, yanking and quickfix entries, and
+appends `(N calls)` to the node when a caller calls the symbol more than once.
+
+==============================================================================
 MAPPINGS					*meow-yarn-mappings*
 
 You can map the commands for easier access.
@@ -432,6 +482,9 @@ Inside the hierarchy view, the following default keymappings are available:
 |`y`|		Yank `file:line` of the selected node to clipboard (`mappings.yank_path`).
 |`<C-d>`|	Scroll preview pane down (`mappings.preview_scroll_down`).
 |`<C-u>`|	Scroll preview pane up (`mappings.preview_scroll_up`).
+|`<Space>`|	Toggle multi-selection for the node (`mappings.toggle_select`).
+|`<Esc>`|	Clear the multi-selection (`mappings.clear_selection`).
+|`<C-q>`|	Send selection to quickfix / trouble (`mappings.send_to_quickfix`).
 |`K` / `J`|	Open new hierarchy from selected item (K=super/callers, J=sub/callees).
 |`<BS>`|	Navigate back one step in the breadcrumb history (`mappings.breadcrumb_back`).
 |`q`|		Quit the hierarchy view (`mappings.quit`).
@@ -466,6 +519,21 @@ ACKNOWLEDGMENTS				*meow-yarn-acknowledgments*
 `meow.yarn.nvim` would not be possible without these amazing projects:
 - Neovim (https://neovim.io/)
 - nui.nvim (https://github.com/MunifTanjim/nui.nvim)
+- trouble.nvim (https://github.com/folke/trouble.nvim) for the optional
+  quickfix integration.
+
+Thanks to everyone who helped shape this plugin:
+- @Sword-Of-Code for suggesting multi-selection, the trouble.nvim
+  integration and a shortcut for re-opening the last search (issue #18).
+- @raphaelahrens for reporting the rendering crash with multi-line symbol
+  names returned by rust-analyzer (issue #17).
+- @qufeiyan for the idea of jumping to the actual call site, matching the
+  behaviour of VS Code's call hierarchy (PR #9).
+- @Nichtigott for reporting the Neovim 0.11+ deprecation warnings
+  (issue #8).
+- @zkamvar for suggesting that repeated LSP error notifications be
+  suppressed (issue #4).
+- @gi4c0 for reporting the invalid highlight color error (issue #3).
 
 ==============================================================================
 vim:tw=78:ts=8:sw=8:sts=8:et:ft=help:norl:
